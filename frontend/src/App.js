@@ -12,7 +12,7 @@ import {
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
 axios.defaults.headers.common['ngrok-skip-browser-warning'] = 'true';
-axios.defaults.baseURL = 'http://localhost:3001';
+axios.defaults.baseURL = window.location.origin;
 
 const fmt = (number) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(number || 0);
 
