@@ -9,8 +9,15 @@ app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 
 // --- SERVIR FRONTEND ---
+
+app.use(express.static(path.join(__dirname, '../frontend/build')));
+// Esta línea es la que permite ver el ERP en el navegador
 app.use(express.static(path.join(__dirname, '../frontend/build')));
 
+// Y esta es para que si refrescas la página no salga error 404
+app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, '../frontend/build', 'index.html'));
+});
 const dbConfig = {
     host: process.env.DB_HOST || 'mysql-14f55f3e-cristiancaicedo68-cf3e.h.aivencloud.com',
     user: process.env.DB_USER || 'avnadmin',
@@ -23,10 +30,12 @@ const pool = mysql.createPool(dbConfig);
 
 // CONFIGURACIÓN CORREO (NODEMAILER)
 const transporter = nodemailer.createTransport({
-    service: 'gmail',
+    host: "smtp.gmail.com",
+    port: 465,
+    secure: true, // true para el puerto 465
     auth: {
         user: 'crisplusplay@gmail.com', 
-        pass: 'hzdq dzzk fooa ocdk' // Tu contraseña de aplicación
+        pass: 'hzdq dzzk fooa ocdk' // <--- ASEGÚRATE QUE SEA LA DE 16 LETRAS DE GOOGLE
     }
 });
 
@@ -160,43 +169,52 @@ app.post('/nomina/liquidar', async (req, res) => {
         const cuentaSalida = metodo_pago === 'Efectivo' ? '1105' : '1110';
         await connection.query("INSERT INTO asientos (comprobante_id, cuenta_codigo, debito, credito) VALUES (?,? ,?,?)", [compId, cuentaSalida, 0, neto]);
 
-        // 5. Correo con diseño moderno 2026
-        await transporter.sendMail({
-            from: '"Pago de Nomina" <crisplusplay@gmail.com>',
-            to: emp.email,
-            subject: `Comprobante Nómina Electrónica - ${emp.nombre}`,
-            html: `
-                <div style="font-family: 'Inter', sans-serif; max-width: 550px; margin: auto; border: 1px solid #f0f0f0; border-radius: 40px; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.05);">
-                    <div style="background: #0f172a; padding: 50px 40px; text-align: center; color: white;">
-                        <h1 style="margin: 0; font-size: 32px; font-weight: 900; letter-spacing: -1.5px;">Empresa <span style="color: #3b82f6;">.</span></h1>
-                        <p style="opacity: 0.6; font-size: 11px; text-transform: uppercase; letter-spacing: 3px; margin-top: 10px;">Recibo de Pago Oficial 2026</p>
-                    </div>
-                    <div style="padding: 40px; background: white;">
-                        <div style="text-align: center; margin-bottom: 30px;">
-                            <h2 style="margin: 0; color: #1e293b; font-size: 22px;">${emp.nombre}</h2>
-                            <p style="color: #64748b; font-size: 14px;">Identificación: ${emp.documento}</p>
+       // 5. Correo con diseño moderno 2026 (PROTEGIDO)
+        try {
+            console.log(`Intentando enviar correo de nómina a: ${emp.email}`);
+            await transporter.sendMail({
+                from: '"AccuCloud Nómina" <crisplusplay@gmail.com>',
+                to: emp.email,
+                subject: `Comprobante Nómina Electrónica - ${emp.nombre}`,
+                html: `
+                    <div style="font-family: 'Helvetica', sans-serif; max-width: 550px; margin: auto; border: 1px solid #f0f0f0; border-radius: 40px; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.05);">
+                        <div style="background: #0f172a; padding: 50px 40px; text-align: center; color: white;">
+                            <h1 style="margin: 0; font-size: 32px; font-weight: 900; letter-spacing: -1.5px;">AccuCloud <span style="color: #3b82f6;">.</span></h1>
+                            <p style="opacity: 0.6; font-size: 11px; text-transform: uppercase; letter-spacing: 3px; margin-top: 10px;">Recibo de Pago Oficial 2026</p>
                         </div>
-                        <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
-                            <tr><td style="padding: 12px 0; color: #64748b;">Sueldo Básico (${dias}d)</td><td style="text-align: right; font-weight: bold; color: #1e293b;">$${sueldoBasico.toLocaleString()}</td></tr>
-                            <tr><td style="padding: 12px 0; color: #64748b;">Auxilio Transporte</td><td style="text-align: right; font-weight: bold; color: #1e293b;">$${auxilio.toLocaleString()}</td></tr>
-                            <tr><td style="padding: 12px 0; color: #64748b;">Horas (${tipo_extra})</td><td style="text-align: right; font-weight: bold; color: #1e293b;">$${valorExtras.toLocaleString()}</td></tr>
-                            <tr style="color: #ef4444;"><td style="padding: 12px 0; border-top: 1px solid #f1f5f9;">Salud/Pensión (8%)</td><td style="text-align: right; font-weight: bold; border-top: 1px solid #f1f5f9;">-$${(salud+pension).toLocaleString()}</td></tr>
-                            <tr><td style="padding: 30px 0 10px 0; font-size: 18px; font-weight: 900; color: #1e293b;">NETO PAGADO</td><td style="padding: 30px 0 10px 0; text-align: right; font-size: 28px; font-weight: 900; color: #3b82f6;">$${neto.toLocaleString()}</td></tr>
-                        </table>
-                        <div style="margin-top: 40px; padding: 20px; background: #f8fafc; border-radius: 20px; font-size: 12px; color: #64748b;">
-                            <p style="margin: 0;"><b>Canal:</b> ${metodo_pago} - ${banco || 'Caja'}</p>
-                            <p style="margin: 5px 0 0 0;"><b>Cuenta:</b> ${cuenta || 'Efectivo'}</p>
+                        <div style="padding: 40px; background: white;">
+                            <div style="text-align: center; margin-bottom: 30px;">
+                                <h2 style="margin: 0; color: #1e293b; font-size: 22px;">${emp.nombre}</h2>
+                                <p style="color: #64748b; font-size: 14px;">Identificación: ${emp.documento}</p>
+                            </div>
+                            <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+                                <tr><td style="padding: 12px 0; color: #64748b;">Sueldo Básico (${dias}d)</td><td style="text-align: right; font-weight: bold; color: #1e293b;">$${parseInt(sueldoBasico).toLocaleString()}</td></tr>
+                                <tr><td style="padding: 12px 0; color: #64748b;">Auxilio Transporte</td><td style="text-align: right; font-weight: bold; color: #1e293b;">$${parseInt(auxilio).toLocaleString()}</td></tr>
+                                <tr><td style="padding: 12px 0; color: #64748b;">Horas (${tipo_extra})</td><td style="text-align: right; font-weight: bold; color: #1e293b;">$${parseInt(valorExtras).toLocaleString()}</td></tr>
+                                <tr style="color: #ef4444;"><td style="padding: 12px 0; border-top: 1px solid #f1f5f9;">Salud/Pensión (8%)</td><td style="text-align: right; font-weight: bold; border-top: 1px solid #f1f5f9;">-$${parseInt(salud + pension).toLocaleString()}</td></tr>
+                                <tr><td style="padding: 30px 0 10px 0; font-size: 18px; font-weight: 900; color: #1e293b;">NETO PAGADO</td><td style="padding: 30px 0 10px 0; text-align: right; font-size: 28px; font-weight: 900; color: #3b82f6;">$${parseInt(neto).toLocaleString()}</td></tr>
+                            </table>
+                            <div style="margin-top: 40px; padding: 20px; background: #f8fafc; border-radius: 20px; font-size: 12px; color: #64748b;">
+                                <p style="margin: 0;"><b>Canal:</b> ${metodo_pago} - ${banco || 'Caja'}</p>
+                                <p style="margin: 5px 0 0 0;"><b>Cuenta:</b> ${cuenta || 'Efectivo'}</p>
+                            </div>
                         </div>
-                    </div>
-                </div>`
-        });
+                    </div>`
+            });
+            console.log("✅ Correo de nómina enviado con éxito");
+        } catch (mailError) {
+            // ESTO EVITA QUE EL SERVIDOR SE CAIGA SI EL CORREO FALLA
+            console.error("❌ Error de envío de correo, pero la nómina se guardó:", mailError.message);
+        }
 
         await connection.commit();
         res.json({ success: true, message: "Liquidado con éxito" });
 
-    } catch (e) { await connection.rollback(); res.status(500).json({ success: false, message: e.message }); }
-    finally { connection.release(); }
-});
+    } catch (e) { 
+        await connection.rollback(); 
+        console.error("❌ Error fatal en liquidación:", e.message);
+        res.status(500).json({ success: false, message: e.message }); 
+    } finally { connection.release(); }
 
 // ================= RUTAS DE CONTABILIDAD PROFESIONAL =================
 
@@ -259,33 +277,38 @@ app.post('/ventas', async (r, s) => {
             [producto_id, nombre_producto, cantidad, tot, 'Pagada', responsable, turno_id, metodo_pago, pago_recibido || tot, cambio || 0]
         );
 
-        // 2. Lógica de Envío de Factura Electrónica
+        // 2. Lógica de Envío de Factura Electrónica (PROTEGIDO)
         if (es_electronica && cliente && cliente.email) {
-            await transporter.sendMail({
-                from: '"Facturación AccuCloud" <crisplusplay@gmail.com>',
-                to: cliente.email,
-                subject: `Factura Electrónica No. POS-${resVenta.insertId}`,
-                html: `
-                    <div style="font-family: sans-serif; padding: 40px; background: #f8fafc;">
-                        <div style="max-width: 600px; margin: auto; background: white; border-radius: 30px; padding: 40px; box-shadow: 0 10px 30px rgba(0,0,0,0.05);">
-                            <h1 style="color: #2563eb; margin: 0;">Factura Electrónica</h1>
-                            <p style="color: #64748b;">Hola ${cliente.nombre}, gracias por tu compra.</p>
-                            <hr style="border: none; border-top: 1px solid #f1f5f9; margin: 30px 0;" />
-                            <table style="width: 100%; border-collapse: collapse;">
-                                <tr>
-                                    <td style="padding: 10px 0; font-weight: bold;">${nombre_producto} x ${cantidad}</td>
-                                    <td style="padding: 10px 0; text-align: right; font-weight: bold;">$${tot.toLocaleString()}</td>
-                                </tr>
-                                <tr>
-                                    <td style="padding: 30px 0 10px 0; font-size: 20px; font-weight: 900; border-top: 2px dashed #f1f5f9;">TOTAL</td>
-                                    <td style="padding: 30px 0 10px 0; text-align: right; font-size: 24px; font-weight: 900; color: #2563eb;">$${tot.toLocaleString()}</td>
-                                </tr>
-                            </table>
-                            <p style="font-size: 10px; color: #cbd5e1; margin-top: 40px; text-align: center;">Documento oficial generado por AccuCloud ERP 2026</p>
-                        </div>
-                    </div>
-                `
-            });
+            try {
+                console.log(`Intentando enviar factura a: ${cliente.email}`);
+                await transporter.sendMail({
+                    from: '"Facturación AccuCloud" <crisplusplay@gmail.com>',
+                    to: cliente.email,
+                    subject: `Factura Electrónica No. POS-${resVenta.insertId}`,
+                    html: `
+                        <div style="font-family: sans-serif; padding: 40px; background: #f8fafc;">
+                            <div style="max-width: 600px; margin: auto; background: white; border-radius: 30px; padding: 40px; box-shadow: 0 10px 30px rgba(0,0,0,0.05);">
+                                <h1 style="color: #2563eb; margin: 0;">AccuCloud <span style="font-weight:100">.</span></h1>
+                                <p style="color: #64748b;">Hola <b>${cliente.nombre}</b>, gracias por tu compra.</p>
+                                <hr style="border: none; border-top: 1px solid #f1f5f9; margin: 30px 0;" />
+                                <table style="width: 100%; border-collapse: collapse;">
+                                    <tr>
+                                        <td style="padding: 10px 0; font-weight: bold;">${nombre_producto} x ${cantidad}</td>
+                                        <td style="padding: 10px 0; text-align: right; font-weight: bold;">$${tot.toLocaleString()}</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 30px 0 10px 0; font-size: 20px; font-weight: 900; border-top: 2px dashed #f1f5f9;">TOTAL PAGADO</td>
+                                        <td style="padding: 30px 0 10px 0; text-align: right; font-size: 24px; font-weight: 900; color: #2563eb;">$${tot.toLocaleString()}</td>
+                                    </tr>
+                                </table>
+                                <p style="font-size: 10px; color: #cbd5e1; margin-top: 40px; text-align: center;">Documento oficial generado por AccuCloud ERP 2026</p>
+                            </div>
+                        </div>`
+                });
+                console.log("✅ Correo de venta enviado");
+            } catch (mailError) {
+                console.error("❌ El correo de venta falló pero la venta se guardó:", mailError.message);
+            }
         }
 
         await c.commit();
