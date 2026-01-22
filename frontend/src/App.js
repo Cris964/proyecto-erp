@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
-import jsPDF from 'jspdf'; // Corregido a minúsculas
+import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import { 
@@ -15,6 +15,9 @@ axios.defaults.baseURL = window.location.origin + '/api';
 
 const fmt = (number) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(number || 0);
 
+// ==========================================
+//    FUNCIÓN GLOBAL: IMPRESIÓN DE FACTURA
+// ==========================================
 const imprimirFactura = (cart, total, responsable, metodo, cliente, recibido, cambio) => {
     try {
         const doc = new jsPDF({ unit: 'mm', format: [80, 150 + (cart.length * 10)] }); 
@@ -72,9 +75,9 @@ function RegisterScreen({ onBack }) {
             <div className="bg-white p-10 rounded-[40px] shadow-2xl w-full max-w-md">
                 <h2 className="text-3xl font-black mb-2 text-slate-800 tracking-tighter">Nueva Cuenta</h2>
                 <form onSubmit={handleRegister} className="space-y-4">
-                    <input className="w-full p-4 border rounded-2xl bg-slate-50 font-bold" placeholder="Nombre Empresa" onChange={e => setForm({...form, nombre: e.target.value})} required />
-                    <input className="w-full p-4 border rounded-2xl bg-slate-50 font-bold" type="email" placeholder="Email" onChange={e => setForm({...form, email: e.target.value})} required />
-                    <input className="w-full p-4 border rounded-2xl bg-slate-50 font-bold" type="password" placeholder="Contraseña" onChange={e => setForm({...form, password: e.target.value})} required />
+                    <input className="w-full p-4 border rounded-2xl bg-slate-50 font-bold" placeholder="Nombre Empresa" value={form.nombre} onChange={e => setForm({...form, nombre: e.target.value})} required />
+                    <input className="w-full p-4 border rounded-2xl bg-slate-50 font-bold" type="email" placeholder="Email" value={form.email} onChange={e => setForm({...form, email: e.target.value})} required />
+                    <input className="w-full p-4 border rounded-2xl bg-slate-50 font-bold" type="password" placeholder="Contraseña" value={form.password} onChange={e => setForm({...form, password: e.target.value})} required />
                     <button className="w-full bg-blue-600 text-white font-black py-4 rounded-2xl">REGISTRARME</button>
                 </form>
                 <button onClick={onBack} className="w-full mt-4 text-slate-400 font-bold text-sm">Volver</button>
@@ -263,7 +266,7 @@ function VentasView({ user, turnoActivo }) {
           if(res.data.success) {
               imprimirFactura(cart, totalVenta, user.nombre, metodo, cliente, pagaCon, devuelta);
               setCart([]); setPagaCon(''); setEsElectronica(false);
-              window.alert("Éxito."); load();
+              window.alert("Venta procesada."); load();
           }
       } catch (e) { window.alert("Error."); }
   };
@@ -368,7 +371,7 @@ function NominaView({ user }) {
       )}
       {mode === 'liquidar' && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-              <div className="bg-white p-12 rounded-[40px] shadow-xl border border-green-100"><h3 className="font-black text-2xl mb-8 text-green-800 tracking-tighter flex items-center gap-3"><Calculator/> LIQUIDADOR</h3><div className="space-y-6"><div><label className="text-[10px] font-black uppercase text-slate-400 ml-4 block mb-2">Empleado</label><select className="w-full p-5 bg-slate-50 border-none rounded-3xl font-black" onChange={e=>setFormLiq({...formLiq, empleado_id: e.target.value})}><option>-- Seleccionar --</option>{empleados.map(e=><option key={e.id} value={e.id}>{e.nombre}</option>)}</select></div><div className="grid grid-cols-2 gap-6"><div><label className="text-[10px] font-black uppercase text-slate-400 ml-4">Días</label><input type="number" className="w-full p-5 bg-slate-50 border-none rounded-3xl font-black" value={formLiq.dias} onChange={e=>setFormLiq({...formLiq, dias: e.target.value})}/></div><div><label className="text-[10px] font-black uppercase text-slate-400 ml-4">Extras</label><input type="number" className="w-full p-5 bg-slate-50 border-none rounded-3xl font-black" value={formLiq.extras} onChange={e=>setFormLiq({...formLiq, extras: e.target.value})}/></div></div><div><label className="text-[10px] font-black uppercase text-slate-400 ml-4">Tipo Recargo</label><select className="w-full p-5 bg-slate-50 border-none rounded-3xl font-black" value={formLiq.tipo_extra} onChange={e=>setFormLiq({...formLiq, tipo_extra: e.target.value})}><option value="Diurna">Diurna</option><option value="Nocturna">Nocturna</option><option value="Dominical">Dominical</option><option value="Recargo_Nocturno">Recargo</option></select></div><button onClick={calcular} className="w-full bg-slate-900 text-white font-black py-5 rounded-3xl shadow-xl hover:bg-black transition-all">CALCULAR</button></div></div>
+              <div className="bg-white p-12 rounded-[40px] shadow-xl border border-green-100"><h3 className="font-black text-xl mb-8 tracking-tighter flex items-center gap-3"><Calculator/> LIQUIDADOR</h3><div className="space-y-6"><div><label className="text-[10px] font-black uppercase text-slate-400 ml-4 block mb-2">Empleado</label><select className="w-full p-5 bg-slate-50 border-none rounded-3xl font-black" onChange={e=>setFormLiq({...formLiq, empleado_id: e.target.value})}><option>-- Seleccionar --</option>{empleados.map(e=><option key={e.id} value={e.id}>{e.nombre}</option>)}</select></div><div className="grid grid-cols-2 gap-6"><div><label className="text-[10px] font-black uppercase text-slate-400 ml-4">Días</label><input type="number" className="w-full p-5 bg-slate-50 border-none rounded-3xl font-black" value={formLiq.dias} onChange={e=>setFormLiq({...formLiq, dias: e.target.value})}/></div><div><label className="text-[10px] font-black uppercase text-slate-400 ml-4">Extras</label><input type="number" className="w-full p-5 bg-slate-50 border-none rounded-3xl font-black" value={formLiq.extras} onChange={e=>setFormLiq({...formLiq, extras: e.target.value})}/></div></div><div><label className="text-[10px] font-black uppercase text-slate-400 ml-4">Tipo Recargo</label><select className="w-full p-5 bg-slate-50 border-none rounded-3xl font-black" value={formLiq.tipo_extra} onChange={e=>setFormLiq({...formLiq, tipo_extra: e.target.value})}><option value="Diurna">Diurna</option><option value="Nocturna">Nocturna</option><option value="Dominical">Dominical</option><option value="Recargo_Nocturno">Recargo</option></select></div><button onClick={calcular} className="w-full bg-slate-900 text-white font-black py-5 rounded-3xl shadow-xl hover:bg-black transition-all">CALCULAR</button></div></div>
               <div className="bg-white p-12 rounded-[40px] shadow-2xl border-l-[12px] border-blue-600 flex flex-col justify-between">{preview ? (<div className="space-y-6 animate-fade-in"><div className="text-center border-b pb-8"><h4 className="text-3xl font-black text-slate-800 tracking-tighter">{preview.nombre}</h4></div><div className="bg-blue-600 p-8 rounded-[32px] text-center text-5xl font-black text-white">{fmt(preview.neto)}</div><button onClick={async ()=>{if(window.confirm(`¿Confirmar pago?`)){await axios.post('/api/nomina/liquidar', {...formLiq, extras: formLiq.extras, responsable: user.nombre}); window.alert("Éxito"); load(); setMode('history'); setPreview(null);}}} className="w-full bg-slate-900 text-white font-black py-6 rounded-[32px] shadow-xl hover:scale-102 transition-all">PAGAR</button></div>) : <div className="h-full flex items-center justify-center opacity-20"><Mail size={100}/></div>}</div>
           </div>
       )}
