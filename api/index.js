@@ -33,7 +33,7 @@ const transporter = nodemailer.createTransport({
 
 // ================= RUTAS DE LA API =================
 
-app.post('/api/register', async (req, res) => {
+app.post('/register', async (req, res) => {
     try {
         const { nombre, email, password } = req.body;
         await pool.query("INSERT INTO usuarios (nombre, email, password, cargo) VALUES (?, ?, ?, ?)", [nombre, email, password, 'Admin']);
@@ -41,14 +41,14 @@ app.post('/api/register', async (req, res) => {
     } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
 
-app.post('/api/login', async (req, res) => {
+app.post('/login', async (req, res) => {
     try { 
         const [rows] = await pool.query("SELECT * FROM usuarios WHERE email = ? AND password = ?", [req.body.email, req.body.password]); 
         res.json(rows.length > 0 ? { success: true, user: rows[0] } : { success: false }); 
     } catch (err) { res.status(500).send(err.message); }
 });
 
-app.get('/api/dashboard-data', async (req, res) => {
+app.get('/dashboard-data', async (req, res) => {
     try {
         const [mayor] = await pool.query("SELECT IFNULL(SUM(total), 0) as total FROM ventas");
         const [bases] = await pool.query("SELECT IFNULL(SUM(base_caja), 0) as total FROM turnos WHERE estado = 'Abierto'");
@@ -59,18 +59,18 @@ app.get('/api/dashboard-data', async (req, res) => {
     } catch (e) { res.status(500).send(e.message); }
 });
 
-app.get('/api/empleados', async (req, res) => {
+app.get('/empleados', async (req, res) => {
     const [rows] = await pool.query("SELECT * FROM empleados");
     res.json(rows);
 });
 
-app.post('/api/empleados', async (req, res) => {
+app.post('/empleados', async (req, res) => {
     const { nombre, documento, cargo, salario, email, eps, arl, pension } = req.body;
     await pool.query("INSERT INTO empleados (nombre, documento, cargo, salario, email, eps, arl, pension_fund) VALUES (?,?,?,?,?,?,?,?)", [nombre, documento, cargo, salario, email, eps, arl, pension]);
     res.json({ success: true });
 });
 
-app.post('/api/nomina/liquidar', async (req, res) => {
+app.post('/nomina/liquidar', async (req, res) => {
     const connection = await pool.getConnection();
     try {
         await connection.beginTransaction();
@@ -113,17 +113,17 @@ app.post('/api/nomina/liquidar', async (req, res) => {
     finally { connection.release(); }
 });
 
-app.get('/api/contabilidad/diario', async (req, res) => {
+app.get('/contabilidad/diario', async (req, res) => {
     const sql = `SELECT c.id as comprobante_id, c.fecha, c.tipo as tipo_doc, c.descripcion, a.cuenta_codigo, p.nombre as cuenta_nombre, a.debito, a.credito FROM comprobantes c JOIN asientos a ON c.id = a.comprobante_id JOIN plan_cuentas p ON a.cuenta_codigo = p.codigo ORDER BY c.fecha DESC`;
     const [rows] = await pool.query(sql); res.json(rows);
 });
 
-app.get('/api/contabilidad/balance', async (req, res) => {
+app.get('/contabilidad/balance', async (req, res) => {
     const sql = `SELECT p.codigo, p.nombre, p.tipo, IFNULL(SUM(a.debito), 0) as total_debito, IFNULL(SUM(a.credito), 0) as total_credito, (IFNULL(SUM(a.debito), 0) - IFNULL(SUM(a.credito), 0)) as saldo FROM plan_cuentas p LEFT JOIN asientos a ON p.codigo = a.cuenta_codigo GROUP BY p.codigo HAVING total_debito > 0 OR total_credito > 0 ORDER BY p.codigo ASC`;
     const [rows] = await pool.query(sql); res.json(rows);
 });
 
-app.post('/api/ventas', async (r, s) => {
+app.post('/ventas', async (r, s) => {
     const c = await pool.getConnection();
     try {
         await c.beginTransaction();
@@ -138,9 +138,9 @@ app.post('/api/ventas', async (r, s) => {
     finally { c.release(); }
 });
 
-app.get('/api/productos', async(r,s)=>{const[d]=await pool.query("SELECT * FROM productos");s.json(d)});
+app.get('/productos', async(r,s)=>{const[d]=await pool.query("SELECT * FROM productos");s.json(d)});
 
-app.post('/api/productos/importar', async (r, s) => {
+app.post('/productos/importar', async (r, s) => {
     const c = await pool.getConnection();
     try {
         await c.beginTransaction();
@@ -152,11 +152,11 @@ app.post('/api/productos/importar', async (r, s) => {
     finally { c.release(); }
 });
 
-app.get('/api/turnos/activo/:id', async(r,s)=>{const[d]=await pool.query("SELECT * FROM turnos WHERE usuario_id=? AND estado='Abierto'",[r.params.id]);s.json(d[0]||null)});
-app.post('/api/turnos/iniciar', async(r,s)=>{const{usuario_id,nombre_usuario,base_caja}=r.body;await pool.query("INSERT INTO turnos (usuario_id,nombre_usuario,base_caja) VALUES (?,?,?)",[usuario_id,nombre_usuario,base_caja]);s.json({success:true});});
-app.put('/api/turnos/finalizar', async(r,s)=>{const[v]=await pool.query("SELECT IFNULL(SUM(total),0) as total FROM ventas WHERE turno_id=?",[r.body.turno_id]);await pool.query("UPDATE turnos SET fecha_fin=NOW(),estado='Cerrado',total_vendido=? WHERE id=?",[v[0].total,r.body.turno_id]);s.json({success:true});});
-app.get('/api/turnos/historial', async(r,s)=>{const[d]=await pool.query("SELECT * FROM turnos ORDER BY fecha_inicio DESC");s.json(d)});
-app.get('/api/nomina/historial', async(r,s)=>{const[d]=await pool.query("SELECT * FROM nominas ORDER BY fecha_pago DESC");s.json(d)});
+app.get('/turnos/activo/:id', async(r,s)=>{const[d]=await pool.query("SELECT * FROM turnos WHERE usuario_id=? AND estado='Abierto'",[r.params.id]);s.json(d[0]||null)});
+app.post('/turnos/iniciar', async(r,s)=>{const{usuario_id,nombre_usuario,base_caja}=r.body;await pool.query("INSERT INTO turnos (usuario_id,nombre_usuario,base_caja) VALUES (?,?,?)",[usuario_id,nombre_usuario,base_caja]);s.json({success:true});});
+app.put('/turnos/finalizar', async(r,s)=>{const[v]=await pool.query("SELECT IFNULL(SUM(total),0) as total FROM ventas WHERE turno_id=?",[r.body.turno_id]);await pool.query("UPDATE turnos SET fecha_fin=NOW(),estado='Cerrado',total_vendido=? WHERE id=?",[v[0].total,r.body.turno_id]);s.json({success:true});});
+app.get('/turnos/historial', async(r,s)=>{const[d]=await pool.query("SELECT * FROM turnos ORDER BY fecha_inicio DESC");s.json(d)});
+app.get('/nomina/historial', async(r,s)=>{const[d]=await pool.query("SELECT * FROM nominas ORDER BY fecha_pago DESC");s.json(d)});
 
 // EXPORTAR PARA VERCEL
 module.exports = app;
