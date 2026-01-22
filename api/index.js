@@ -7,20 +7,18 @@ const app = express();
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 
-// 1. CONFIGURACIÓN DE BASE DE DATOS (AIVEN CLOUD)
+// 1. CONFIGURACIÓN DE BASE DE DATOS
 const dbConfig = {
     host: process.env.DB_HOST,
     user: process.env.DB_USER,
     password: process.env.DB_PASSWORD, 
     database: process.env.DB_NAME,
     port: Number(process.env.DB_PORT),
-    ssl: { 
-        rejectUnauthorized: false 
-    },
+    ssl: { rejectUnauthorized: false },
     connectTimeout: 10000
 };
 
-// --- ESTA ES LA LÍNEA QUE TE FALTABA ---
+// --- ESTA LÍNEA DEBE ESTAR AQUÍ (La habías borrado) ---
 const pool = mysql.createPool(dbConfig); 
 
 // 2. CONFIGURACIÓN CORREO
