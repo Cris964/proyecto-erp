@@ -19,55 +19,35 @@ const fmt = (number) => new Intl.NumberFormat('es-CO', { style: 'currency', curr
 // ==========================================
 //    FUNCIÓN GLOBAL: IMPRESIÓN DE FACTURA
 // ==========================================
-const imprimirFactura = (venta, cliente) => {
+const imprimirFactura = (cart, total, responsable, metodo, cliente, recibido, cambio) => {
     try {
-        const doc = new jsPDF({ unit: 'mm', format: [80, 150] }); 
+        const doc = new jsPDF({ unit: 'mm', format: [80, 150 + (cart.length * 10)] }); 
         const ancho = 80;
-        const nombreCliente = cliente?.nombre || "Consumidor Final";
-        const nitCliente = cliente?.nit || "222222222222";
 
-        doc.setFontSize(14);
-        doc.text("ACCUCLOUD ERP", ancho/2, 10, {align: 'center'});
-        doc.setFontSize(7);
-        doc.text("------------------------------------------", ancho/2, 15, {align: 'center'});
-
+        doc.setFontSize(14); doc.text("ACCUCLOUD ERP", ancho/2, 10, {align: 'center'});
         doc.setFontSize(8);
-        doc.text(`Fecha: ${new Date().toLocaleString()}`, 5, 22);
-        doc.text(`Cajero: ${venta.responsable || 'Cajero'}`, 5, 26);
-        doc.text(`Cliente: ${nombreCliente}`, 5, 30);
-        doc.text(`NIT/CC: ${nitCliente}`, 5, 34);
+        doc.text(`Fecha: ${new Date().toLocaleString()}`, 5, 20);
+        doc.text(`Cajero: ${responsable}`, 5, 24);
+        doc.text(`Cliente: ${cliente?.nombre || 'General'}`, 5, 28);
 
         autoTable(doc, {
-            startY: 40,
+            startY: 35,
             margin: { left: 2, right: 2 },
-            head: [['Cant', 'Producto', 'Total']],
-            body: [
-                [
-                    venta.cantidad || 1, 
-                    (venta.nombre_producto || 'Producto').substring(0, 15), 
-                    fmt(venta.total || 0)
-                ]
-            ],
+            head: [['Cant', 'Producto', 'Subt']],
+            body: cart.map(p => [p.cantidad, p.nombre.substring(0,12), fmt(p.precio * p.cantidad)]),
             theme: 'plain',
-            styles: { fontSize: 7, cellPadding: 1 }
+            styles: { fontSize: 7 }
         });
 
-        const finalY = doc.lastAutoTable.finalY + 8;
+        const finalY = doc.lastAutoTable.finalY + 5;
         doc.setFontSize(10);
-        doc.text(`TOTAL: ${fmt(venta.total || 0)}`, ancho - 5, finalY, { align: 'right' });
-        
+        doc.text(`TOTAL: ${fmt(total)}`, ancho - 5, finalY, { align: 'right' });
         doc.setFontSize(7);
-        doc.text(`Paga con: ${fmt(venta.pago_recibido || 0)}`, 5, finalY + 5);
-        doc.text(`Cambio: ${fmt(venta.cambio || 0)}`, 5, finalY + 9);
-        doc.text("¡Gracias por su compra!", ancho / 2, finalY + 18, { align: 'center' });
+        doc.text(`Recibido: ${fmt(recibido)}`, 5, finalY + 5);
+        doc.text(`Cambio: ${fmt(cambio)}`, 5, finalY + 9);
 
-        const pdfOutput = doc.output('bloburl');
-        window.open(pdfOutput, '_blank');
-
-    } catch (error) {
-        console.error("Error detallado:", error);
-        window.alert("Hubo un error con el PDF.");
-    }
+        window.open(doc.output('bloburl'), '_blank');
+    } catch (e) { console.error(e); }
 };
 
 // ==========================================
@@ -254,7 +234,7 @@ function CajaView({ user, turnoActivo, onUpdate }) {
 function VentasView({ user, turnoActivo }) {
   const [productos, setProductos] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
-  const [ventaForm, setVentaForm] = useState({ producto_id: '', cantidad: 1, precio: 0, nombre: '' });
+  const [cart, setCart] = useState([]); // EL CARRITO
   const [metodo, setMetodo] = useState('Efectivo');
   const [pagaCon, setPagaCon] = useState('');
   const [esElectronica, setEsElectronica] = useState(false);
@@ -263,64 +243,117 @@ function VentasView({ user, turnoActivo }) {
   const load = useCallback(() => axios.get('/productos').then(res => setProductos(res.data)), []);
   useEffect(() => { load(); }, [load]);
 
-  const totalVenta = ventaForm.cantidad * ventaForm.precio;
+  const totalVenta = cart.reduce((sum, p) => sum + (p.precio * p.cantidad), 0);
   const devuelta = (parseFloat(pagaCon) || 0) - totalVenta;
 
+  // Lógica para agregar al carrito (Pistola o Click)
+  const addToCart = (prod) => {
+      const existe = cart.find(item => item.id === prod.id);
+      if (existe) {
+          setCart(cart.map(item => item.id === prod.id ? { ...item, cantidad: item.cantidad + 1 } : item));
+      } else {
+          setCart([...cart, { ...prod, cantidad: 1 }]);
+      }
+      setSearchTerm('');
+  };
+
+  // Escucha la pistola de códigos
+  useEffect(() => {
+    let barcode = "";
+    const handleKey = (e) => {
+        if(e.key === 'Enter') {
+            const prod = productos.find(p => p.sku === barcode);
+            if(prod) addToCart(prod);
+            barcode = "";
+        } else { barcode += e.key; }
+    };
+    window.addEventListener('keypress', handleKey);
+    return () => window.removeEventListener('keypress', handleKey);
+  }, [productos, cart]);
+
   const procesar = async () => {
-      if(!ventaForm.producto_id) return window.alert("Selecciona un producto.");
-      if(metodo === 'Efectivo' && (parseFloat(pagaCon) < totalVenta || !pagaCon)) return window.alert("Monto insuficiente.");
+      if(cart.length === 0) return window.alert("El carrito está vacío.");
+      if(metodo === 'Efectivo' && (parseFloat(pagaCon) < totalVenta || !pagaCon)) return window.alert("Dinero insuficiente.");
+
       try {
           const res = await axios.post('/ventas', {
-              producto_id: ventaForm.producto_id, nombre_producto: ventaForm.nombre, precio_unitario: ventaForm.precio, cantidad: ventaForm.cantidad,
-              responsable: user.nombre, turno_id: turnoActivo.id, metodo_pago: metodo, es_electronica: esElectronica,
-              cliente: esElectronica ? cliente : { nombre: 'General', nit: '222' }, pago_recibido: pagaCon || totalVenta, cambio: devuelta > 0 ? devuelta : 0
+              productos: cart,
+              responsable: user.nombre,
+              turno_id: turnoActivo.id,
+              metodo_pago: metodo,
+              es_electronica: esElectronica,
+              cliente: esElectronica ? cliente : null,
+              pago_recibido: pagaCon,
+              cambio: devuelta
           });
+
           if(res.data.success) {
-              imprimirFactura({ ...ventaForm, total: totalVenta, responsable: user.nombre, metodo_pago: metodo, pago_recibido: pagaCon, cambio: devuelta }, esElectronica ? cliente : null);
-              setVentaForm({ producto_id: '', cantidad: 1, precio: 0, nombre: '' });
-              setPagaCon(''); setEsElectronica(false); setSearchTerm('');
-              window.alert("Completado."); load(); 
+              imprimirFactura(cart, totalVenta, user.nombre, metodo, cliente, pagaCon, devuelta);
+              setCart([]); setPagaCon(''); setEsElectronica(false);
+              window.alert("Venta procesada con éxito.");
+              load();
           }
-      } catch (e) { window.alert("Error."); }
+      } catch (e) { window.alert("Error en el servidor."); }
   };
 
   if(!turnoActivo) return <div className="text-center p-20 opacity-30"><h2>INICIA TURNO PARA VENDER</h2></div>;
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-        <div className="bg-white p-10 rounded-[40px] shadow-xl border border-blue-50">
-            <h3 className="font-black text-2xl mb-8 flex items-center gap-3 tracking-tighter"><ScanBarcode className="text-blue-600"/> CAJA</h3>
-            <div className="space-y-6">
-                <div>
-                    <input className="w-full p-4 border rounded-2xl bg-slate-50 font-bold" placeholder="Buscar..." value={searchTerm} onChange={e=>setSearchTerm(e.target.value)} />
-                    {searchTerm && <div className="absolute bg-white border rounded-2xl shadow-2xl z-50 p-4 w-80 mt-2">
-                        {productos.filter(p=>p.nombre.toLowerCase().includes(searchTerm.toLowerCase()) || p.sku.includes(searchTerm)).map(p=>(
-                            <div key={p.id} onClick={()=>{setVentaForm({producto_id:p.id,nombre:p.nombre,precio:p.precio,cantidad:1});setSearchTerm('');}} className="p-2 border-b cursor-pointer font-bold">{p.nombre}</div>
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-fade-in">
+        <div className="lg:col-span-2 bg-white p-8 rounded-[40px] shadow-xl border border-blue-50">
+            <h3 className="font-black text-2xl mb-6 flex items-center gap-3"><ScanBarcode className="text-blue-600"/> TPV 2026</h3>
+            <input autoFocus className="w-full p-4 border rounded-2xl bg-slate-50 font-bold mb-6" placeholder="Escanea o busca producto..." value={searchTerm} onChange={e=>setSearchTerm(e.target.value)} />
+            
+            {/* Lista de búsqueda */}
+            {searchTerm && <div className="absolute bg-white border rounded-2xl shadow-2xl z-50 p-4 w-1/2 mt-[-20px]">{productos.filter(p=>p.nombre.toLowerCase().includes(searchTerm.toLowerCase()) || p.sku.includes(searchTerm)).map(p=>(<div key={p.id} onClick={()=>addToCart(p)} className="p-2 border-b cursor-pointer hover:bg-blue-50"><b>{p.nombre}</b> - {fmt(p.precio)}</div>))}</div>}
+
+            {/* TABLA DEL CARRITO */}
+            <div className="max-h-[300px] overflow-auto">
+                <table className="w-full text-left">
+                    <thead className="text-[10px] font-black uppercase text-slate-400 border-b"><tr><th className="pb-4">Producto</th><th>Cant</th><th>Subtotal</th><th></th></tr></thead>
+                    <tbody>
+                        {cart.map((item, i) => (
+                            <tr key={i} className="border-b">
+                                <td className="py-4 font-bold">{item.nombre}</td>
+                                <td><input type="number" className="w-16 border rounded-lg text-center" value={item.cantidad} onChange={(e) => {
+                                    const val = parseInt(e.target.value);
+                                    setCart(cart.map(it => it.id === item.id ? { ...it, cantidad: val > 0 ? val : 1 } : it));
+                                }} /></td>
+                                <td className="font-black">{fmt(item.precio * item.cantidad)}</td>
+                                <td><button onClick={()=>setCart(cart.filter(it => it.id !== item.id))} className="text-red-500"><X size={16}/></button></td>
+                            </tr>
                         ))}
-                    </div>}
-                </div>
-                {ventaForm.nombre && <div className="bg-blue-50 p-6 rounded-3xl flex justify-between items-center"><span className="font-black">{ventaForm.nombre}</span><input type="number" className="w-20 p-2 rounded-xl text-center font-bold" value={ventaForm.cantidad} onChange={e=>setVentaForm({...ventaForm, cantidad: e.target.value})} /></div>}
-                <div className="flex gap-4">
-                    <button onClick={()=>setMetodo('Efectivo')} className={`flex-1 p-4 rounded-2xl font-bold border ${metodo==='Efectivo'?'bg-green-50 border-green-500 text-green-700':'bg-white'}`}>EFECTIVO</button>
-                    <button onClick={()=>setMetodo('Transferencia')} className={`flex-1 p-4 rounded-2xl font-bold border ${metodo==='Transferencia'?'bg-blue-100 border-blue-500 text-blue-700':'bg-white'}`}>TRANSFERENCIA</button>
-                </div>
-                {metodo === 'Efectivo' && (
-                    <div className="bg-slate-50 p-6 rounded-3xl border-2 border-dashed">
-                        <div className="flex justify-between items-center mb-2"><span>Paga con:</span><input type="number" className="w-32 p-2 rounded-xl text-right font-black text-green-600" value={pagaCon} onChange={e=>setPagaCon(e.target.value)} /></div>
-                        <div className="flex justify-between font-black text-blue-600 border-t pt-2"><span>Cambio: {fmt(devuelta)}</span></div>
-                    </div>
-                )}
-                <div className="p-4 bg-slate-900 rounded-3xl text-white flex justify-between items-center cursor-pointer" onClick={()=>setEsElectronica(!esElectronica)}><span className="font-bold text-xs uppercase">Factura Electrónica</span><div className={`w-10 h-5 rounded-full relative ${esElectronica?'bg-blue-500':'bg-slate-700'}`}><div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-all ${esElectronica?'left-5':'left-1'}`}></div></div></div>
-                {esElectronica && <div className="grid grid-cols-2 gap-4 animate-fade-in text-white"><input className="p-3 bg-slate-800 rounded-xl text-xs" placeholder="Nombre" onChange={e=>setCliente({...cliente, nombre: e.target.value})} /><input className="p-3 bg-slate-800 rounded-xl text-xs" placeholder="NIT" onChange={e=>setCliente({...cliente, nit: e.target.value})} /><input className="p-3 bg-slate-800 rounded-xl text-xs" placeholder="Email" onChange={e=>setCliente({...cliente, email: e.target.value})} /><input className="p-3 bg-slate-800 rounded-xl text-xs" placeholder="Tel" onChange={e=>setCliente({...cliente, tel: e.target.value})} /></div>}
+                    </tbody>
+                </table>
             </div>
         </div>
-        <div className="bg-white p-12 rounded-[40px] shadow-2xl border border-slate-100 text-center flex flex-col justify-between">
-            <h1 className="text-7xl font-black text-slate-800 tracking-tighter">{fmt(totalVenta)}</h1>
-            <button onClick={procesar} className="w-full bg-blue-600 text-white font-black py-7 rounded-[32px] shadow-2xl hover:scale-105 transition-all text-2xl mt-10">CONFIRMAR</button>
+
+        {/* PANEL DE PAGO */}
+        <div className="bg-white p-8 rounded-[40px] shadow-xl border flex flex-col justify-between">
+            <div className="space-y-6">
+                <div className="text-center">
+                    <p className="text-xs font-black text-slate-400">TOTAL A COBRAR</p>
+                    <h1 className="text-5xl font-black text-blue-600">{fmt(totalVenta)}</h1>
+                </div>
+                <div className="flex gap-2">
+                    <button onClick={()=>setMetodo('Efectivo')} className={`flex-1 p-3 rounded-2xl font-bold border ${metodo==='Efectivo'?'bg-green-50 border-green-500 text-green-700':'bg-white'}`}>EFECTIVO</button>
+                    <button onClick={()=>setMetodo('Transferencia')} className={`flex-1 p-3 rounded-2xl font-bold border ${metodo==='Transferencia'?'bg-blue-50 border-blue-300 text-blue-700':'bg-white'}`}>BANCO</button>
+                </div>
+                {metodo === 'Efectivo' && (
+                    <div className="bg-slate-50 p-4 rounded-3xl border-2 border-dashed">
+                        <div className="flex justify-between items-center mb-2"><span>Recibido:</span><input type="number" className="w-24 p-2 rounded-xl text-right font-bold" value={pagaCon} onChange={e=>setPagaCon(e.target.value)} /></div>
+                        <div className="flex justify-between font-black text-blue-600"><span>Cambio:</span><span>{fmt(devuelta)}</span></div>
+                    </div>
+                )}
+                <div className="p-4 bg-slate-900 rounded-3xl text-white flex justify-between items-center cursor-pointer" onClick={()=>setEsElectronica(!esElectronica)}><span className="text-xs font-bold">Factura Electrónica</span><div className={`w-8 h-4 rounded-full relative ${esElectronica?'bg-blue-500':'bg-slate-700'}`}><div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-all ${esElectronica?'left-4':'left-1'}`}></div></div></div>
+                {esElectronica && <input className="w-full p-3 bg-slate-100 rounded-xl text-xs" placeholder="Email del cliente" onChange={e=>setCliente({...cliente, email: e.target.value})} />}
+            </div>
+            <button onClick={procesar} className="w-full bg-blue-600 text-white font-black py-5 rounded-3xl shadow-xl mt-6">PAGAR TODO</button>
         </div>
     </div>
   );
 }
+
 
 function InventarioView({ user }) {
   const [productos, setProductos] = useState([]);

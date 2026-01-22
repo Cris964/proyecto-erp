@@ -19,7 +19,7 @@ const dbConfig = {
 };
 const pool = mysql.createPool(dbConfig);
 
-// 2. CONFIGURACIÓN CORREO (GMAIL CON TLS PARA RENDER)
+// 1. TRANSPORTER ACTUALIZADO (MÁS SEGURO PARA RENDER)
 const transporter = nodemailer.createTransport({
     host: "smtp.gmail.com",
     port: 465,
@@ -28,9 +28,7 @@ const transporter = nodemailer.createTransport({
         user: 'crisplusplay@gmail.com', 
         pass: 'hzdq dzzk fooa ocdk' 
     },
-    tls: {
-        rejectUnauthorized: false 
-    }
+    tls: { rejectUnauthorized: false }
 });
 
 // ==========================================
@@ -142,26 +140,59 @@ app.post('/nomina/liquidar', async (req, res) => {
     } finally { connection.release(); }
 });
 
-// Ventas
+// 2. RUTA DE VENTAS PARA MÚLTIPLES PRODUCTOS
 app.post('/ventas', async (r, s) => {
     const c = await pool.getConnection();
     try {
         await c.beginTransaction();
-        const { producto_id, nombre_producto, cantidad, precio_unitario, responsable, turno_id, metodo_pago, es_electronica, cliente, pago_recibido, cambio } = r.body;
-        const tot = cantidad * precio_unitario;
-        const [resVenta] = await c.query("INSERT INTO ventas (producto_id, nombre_producto, cantidad, total, estado, responsable, turno_id, metodo_pago, dinero_recibido, cambio) VALUES (?,?,?,?,?,?,?,?,?,?)", [producto_id, nombre_producto, cantidad, tot, 'Pagada', responsable, turno_id, metodo_pago, pago_recibido || tot, cambio || 0]);
+        const { productos, responsable, turno_id, metodo_pago, es_electronica, cliente, pago_recibido, cambio } = r.body;
         
+        if (!turno_id) throw new Error("Inicia Turno primero.");
+
+        let totalVenta = 0;
+        let listaHtml = ""; // Para el correo
+
+        // Procesar cada producto del carrito
+        for (const p of productos) {
+            const subtotal = p.cantidad * p.precio;
+            totalVenta += subtotal;
+            listaHtml += `<li>${p.nombre} x ${p.cantidad} = $${subtotal.toLocaleString()}</li>`;
+
+            // 1. Restar Stock
+            await c.query("UPDATE productos SET stock = stock - ? WHERE id = ?", [p.cantidad, p.id]);
+
+            // 2. Guardar cada item en la tabla ventas
+            await c.query(
+                "INSERT INTO ventas (producto_id, nombre_producto, cantidad, total, estado, responsable, turno_id, metodo_pago, dinero_recibido, cambio) VALUES (?,?,?,?,?,?,?,?,?,?)",
+                [p.id, p.nombre, p.cantidad, subtotal, 'Pagada', responsable, turno_id, metodo_pago, pago_recibido || 0, cambio || 0]
+            );
+        }
+
+        // 3. Factura Electrónica por Correo
         if (es_electronica && cliente?.email) {
             try {
                 await transporter.sendMail({
-                    from: '"Facturación AccuCloud" <crisplusplay@gmail.com>', to: cliente.email, subject: `Factura POS-${resVenta.insertId}`,
-                    html: `<h1>Gracias por tu compra</h1><p>Total pagado: $${tot.toLocaleString()}</p>`
+                    from: '"Facturación AccuCloud" <crisplusplay@gmail.com>',
+                    to: cliente.email,
+                    subject: `Factura Electrónica AccuCloud`,
+                    html: `
+                        <div style="font-family: sans-serif; padding: 30px; border: 1px solid #eee; border-radius: 20px;">
+                            <h2 style="color: #2563eb;">Factura de Venta</h2>
+                            <p>Hola <b>${cliente.nombre}</b>, aquí tienes el detalle de tu compra:</p>
+                            <ul>${listaHtml}</ul>
+                            <hr/>
+                            <h2 style="text-align: right;">TOTAL: $${totalVenta.toLocaleString()}</h2>
+                        </div>`
                 });
             } catch (mailErr) { console.error("Error correo venta:", mailErr.message); }
         }
-        await c.commit(); s.json({ success: true, id: resVenta.insertId });
-    } catch (e) { await c.rollback(); s.status(500).json({ success: false, message: e.message }); }
-    finally { c.release(); }
+
+        await c.commit();
+        s.json({ success: true });
+    } catch (e) { 
+        await c.rollback(); 
+        s.status(500).json({ success: false, message: e.message }); 
+    } finally { c.release(); }
 });
 
 // Contabilidad Profesional
