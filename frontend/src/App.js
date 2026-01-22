@@ -15,9 +15,6 @@ axios.defaults.baseURL = window.location.origin + '/api';
 
 const fmt = (number) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(number || 0);
 
-// ==========================================
-//    FUNCIÓN GLOBAL: IMPRESIÓN DE FACTURA
-// ==========================================
 const imprimirFactura = (cart, total, responsable, metodo, cliente, recibido, cambio) => {
     try {
         const doc = new jsPDF({ unit: 'mm', format: [80, 150 + (cart.length * 10)] }); 
@@ -78,7 +75,7 @@ function RegisterScreen({ onBack }) {
                     <input className="w-full p-4 border rounded-2xl bg-slate-50 font-bold" placeholder="Nombre Empresa" value={form.nombre} onChange={e => setForm({...form, nombre: e.target.value})} required />
                     <input className="w-full p-4 border rounded-2xl bg-slate-50 font-bold" type="email" placeholder="Email" value={form.email} onChange={e => setForm({...form, email: e.target.value})} required />
                     <input className="w-full p-4 border rounded-2xl bg-slate-50 font-bold" type="password" placeholder="Contraseña" value={form.password} onChange={e => setForm({...form, password: e.target.value})} required />
-                    <button className="w-full bg-blue-600 text-white font-black py-4 rounded-2xl shadow-xl">REGISTRARME</button>
+                    <button className="w-full bg-blue-600 text-white font-black py-4 rounded-2xl">REGISTRARME</button>
                 </form>
                 <button onClick={onBack} className="w-full mt-4 text-slate-400 font-bold text-sm">Volver</button>
             </div>
@@ -104,7 +101,7 @@ function LoginScreen({ onLogin, onGoToRegister }) {
         <form onSubmit={handle} className="space-y-4">
           <input className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold" value={email} onChange={e => setEmail(e.target.value)} placeholder="Email" />
           <input type="password" className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold" value={password} onChange={e => setPassword(e.target.value)} placeholder="Contraseña" />
-          <button className="w-full bg-slate-900 text-white font-black py-4 rounded-2xl shadow-xl hover:bg-black transition-all">INGRESAR</button>
+          <button className="w-full bg-slate-900 text-white font-black py-4 rounded-2xl shadow-xl">INGRESAR</button>
         </form>
         <button onClick={onGoToRegister} className="w-full mt-8 text-blue-600 font-black text-sm hover:underline">REGISTRAR EMPRESA</button>
       </div>
@@ -116,13 +113,13 @@ function Dashboard({ user, onLogout }) {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [turnoActivo, setTurnoActivo] = useState(null);
   const recargarTurno = useCallback(() => {
-    if (user) axios.get(`/turnos/activo/${user.id}`).then(res => setTurnoActivo(res.data));
+    if (user) axios.get('/turnos/activo/' + user.id).then(res => setTurnoActivo(res.data));
   }, [user]);
   useEffect(() => { recargarTurno(); }, [recargarTurno]);
   return (
     <div className="flex h-screen overflow-hidden bg-slate-50">
       <aside className="w-72 bg-white border-r flex flex-col z-20 shadow-xl px-6">
-        <div className="h-28 flex items-center font-black text-2xl text-slate-800 uppercase tracking-tighter italic">ACCUCLOUD <span className="text-blue-600">.</span></div>
+        <div className="h-28 flex items-center font-black text-2xl text-slate-800 italic uppercase">ACCUCLOUD <span className="text-blue-600">.</span></div>
         <nav className="flex-1 space-y-1 overflow-y-auto">
           <MenuButton icon={<LayoutDashboard size={20}/>} label="Dashboard" active={activeTab==='dashboard'} onClick={()=>setActiveTab('dashboard')} />
           <div className="px-4 text-[10px] font-black text-slate-300 uppercase mt-8 mb-4 tracking-[2px]">Operaciones</div>
@@ -201,7 +198,7 @@ function CajaView({ user, turnoActivo, onUpdate }) {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-fade-in">
             <div className="bg-white p-10 rounded-[40px] shadow-xl border border-blue-50 text-center flex flex-col justify-center">
                 <div className={`w-24 h-24 mx-auto rounded-[32px] flex items-center justify-center mb-8 ${turnoActivo ? 'bg-green-50 text-green-500' : 'bg-red-50 text-red-500'}`}>{turnoActivo ? <ScanBarcode size={48}/> : <Lock size={48}/>}</div>
-                <h3 className="text-3xl font-black mb-2 tracking-tighter">{turnoActivo ? "CAJA ABIERTA" : "CAJA CERRADA"}</h3>
+                <h3 className="text-3xl font-black mb-2">{turnoActivo ? "CAJA ABIERTA" : "CAJA CERRADA"}</h3>
                 {turnoActivo && <div className="bg-slate-50 p-6 rounded-3xl mb-8 text-left font-black tracking-tight italic">Ventas Hoy: <span className="text-green-600">{fmt(turnoActivo.total_vendido)}</span></div>}
                 <button onClick={async ()=>{
                     if(turnoActivo){ if(window.confirm("¿Cerrar?")) { await axios.put('/turnos/finalizar', { turno_id: turnoActivo.id }); onUpdate(); loadHistorial(); } }
@@ -212,7 +209,7 @@ function CajaView({ user, turnoActivo, onUpdate }) {
             </div>
             <div className="lg:col-span-2 bg-white rounded-[40px] shadow-sm border border-slate-100 overflow-hidden pr-2">
                 <table className="w-full text-left">
-                    <thead className="bg-slate-50/50 text-[10px] font-black uppercase tracking-widest border-b"><tr className="border-b"><th className="p-8">Responsable</th><th>Base</th><th className="text-right">Ventas</th><th className="p-8 text-center">Estado</th></tr></thead>
+                    <thead className="bg-slate-50/50 text-[10px] font-black uppercase tracking-widest"><tr className="border-b"><th className="p-8">Responsable</th><th>Base</th><th className="text-right">Ventas</th><th className="p-8 text-center">Estado</th></tr></thead>
                     <tbody>{historial.map(t => (<tr key={t.id} className="border-b hover:bg-slate-50 transition">
                         <td className="p-8 font-black">{t.nombre_usuario}</td><td>{fmt(t.base_caja)}</td><td className="text-right font-black text-blue-600">{fmt(t.total_vendido)}</td><td className="p-8 text-center uppercase text-[10px] font-black">{t.estado}</td>
                     </tr>))}</tbody>
@@ -298,7 +295,7 @@ function VentasView({ user, turnoActivo }) {
                 <div className="flex gap-2"><button onClick={()=>setMetodo('Efectivo')} className={`flex-1 p-3 rounded-2xl font-bold border transition-all ${metodo==='Efectivo'?'bg-green-50 border-green-500 text-green-700 shadow-xl shadow-green-50':'bg-white text-slate-400 border-slate-50'}`}>EFECTIVO</button><button onClick={()=>setMetodo('Transferencia')} className={`flex-1 p-3 rounded-2xl font-bold border transition-all ${metodo==='Transferencia'?'bg-blue-50 border-blue-300 text-blue-700 shadow-xl shadow-blue-100':'bg-white text-slate-400 border-slate-50'}`}>BANCO</button></div>
                 {metodo === 'Efectivo' && <div className="bg-slate-50 p-4 rounded-3xl border-2 border-dashed border-slate-200"><div className="flex justify-between items-center mb-2"><span className="text-xs font-black uppercase text-slate-400">Recibido:</span><input type="number" className="w-24 p-2 rounded-xl text-right font-black text-green-600" value={pagaCon} onChange={e=>setPagaCon(e.target.value)} /></div><div className="flex justify-between font-black text-blue-600 tracking-tighter border-t pt-2 mt-2"><span>Cambio:</span><span>{fmt(devuelta)}</span></div></div>}
                 <div className="p-4 bg-slate-900 rounded-3xl text-white flex justify-between items-center cursor-pointer hover:bg-black transition-all" onClick={()=>setEsElectronica(!esElectronica)}><div className="flex items-center gap-2"><Mail size={16}/><span className="text-[10px] font-black uppercase tracking-widest">Factura Electrónica</span></div><div className={`w-8 h-4 rounded-full relative transition-all ${esElectronica?'bg-blue-500':'bg-slate-700'}`}><div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-all ${esElectronica?'left-4':'left-1'}`}></div></div></div>
-                {esElectronica && <div className="space-y-2 animate-fade-in"><input className="w-full p-3 bg-slate-50 border-none rounded-xl text-xs font-black text-slate-700" placeholder="Nombre/Empresa" onChange={e=>setCliente(prev => ({...prev, nombre: e.target.value}))} /><input className="w-full p-3 bg-slate-50 border-none rounded-xl text-xs font-black text-slate-700" placeholder="NIT" onChange={e=>setCliente(prev => ({...prev, nit: e.target.value}))} /><input className="w-full p-3 bg-slate-50 border-none rounded-xl text-xs font-black text-slate-700" placeholder="Email" onChange={e=>setCliente(prev => ({...prev, email: e.target.value}))} /></div>}
+                {esElectronica && <div className="space-y-2 animate-fade-in"><input className="w-full p-3 bg-slate-50 border-none rounded-xl text-xs font-black text-slate-700" placeholder="Nombre" onChange={e=>setCliente(prev => ({...prev, nombre: e.target.value}))} /><input className="w-full p-3 bg-slate-50 border-none rounded-xl text-xs font-black text-slate-700" placeholder="NIT" onChange={e=>setCliente(prev => ({...prev, nit: e.target.value}))} /><input className="w-full p-3 bg-slate-50 border-none rounded-xl text-xs font-black text-slate-700" placeholder="Email" onChange={e=>setCliente(prev => ({...prev, email: e.target.value}))} /></div>}
             </div>
             <button onClick={procesar} className="w-full bg-blue-600 text-white font-black py-5 rounded-[28px] shadow-2xl shadow-blue-100 hover:scale-[1.03] transition-all active:scale-95 text-xl tracking-tight mt-6">PAGAR</button>
         </div>
@@ -347,7 +344,7 @@ function InventarioView({ user }) {
                 <thead className="bg-slate-50/50 text-[10px] font-black uppercase tracking-widest border-b"><tr><th className="p-8">Producto</th><th>SKU</th><th>Precio</th><th>Stock</th><th className="p-8 text-center">Estado</th></tr></thead>
                 <tbody>{productos.map(p=>(<tr key={p.id} className="border-b hover:bg-slate-50 transition">
                     <td className="p-8 font-black text-slate-800">{p.nombre}</td><td className="font-mono text-slate-400 font-bold">{p.sku}</td><td className="font-black text-slate-700">{fmt(p.precio)}</td><td className="font-black text-slate-800">{p.stock}</td>
-                    <td className="p-8 text-center">{p.stock <= p.min_stock ? <span className="bg-red-50 text-red-600 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-[1px]">Crítico</span> : <span className="bg-green-100 text-green-700 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-[1px]">Disponible</span>}</td>
+                    <td className="p-8 text-center">{p.stock <= p.min_stock ? <span className="bg-red-50 text-red-600 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-[1px]">Crítico</span> : <span className="bg-green-50 text-green-700 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-[1px]">Disponible</span>}</td>
                 </tr>))}</tbody>
             </table>
         </div>
