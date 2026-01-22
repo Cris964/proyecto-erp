@@ -201,7 +201,7 @@ function CajaView({ user, turnoActivo, onUpdate }) {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-fade-in">
             <div className="bg-white p-10 rounded-[40px] shadow-xl border border-blue-50 text-center flex flex-col justify-center">
                 <div className={`w-24 h-24 mx-auto rounded-[32px] flex items-center justify-center mb-8 ${turnoActivo ? 'bg-green-50 text-green-500' : 'bg-red-50 text-red-500'}`}>{turnoActivo ? <ScanBarcode size={48}/> : <Lock size={48}/>}</div>
-                <h3 className="text-3xl font-black mb-2">{turnoActivo ? "CAJA ABIERTA" : "CAJA CERRADA"}</h3>
+                <h3 className="text-3xl font-black mb-2 tracking-tighter">{turnoActivo ? "CAJA ABIERTA" : "CAJA CERRADA"}</h3>
                 {turnoActivo && <div className="bg-slate-50 p-6 rounded-3xl mb-8 text-left font-black tracking-tight italic">Ventas Hoy: <span className="text-green-600">{fmt(turnoActivo.total_vendido)}</span></div>}
                 <button onClick={async ()=>{
                     if(turnoActivo){ if(window.confirm("¿Cerrar?")) { await axios.put('/turnos/finalizar', { turno_id: turnoActivo.id }); onUpdate(); loadHistorial(); } }
@@ -212,7 +212,7 @@ function CajaView({ user, turnoActivo, onUpdate }) {
             </div>
             <div className="lg:col-span-2 bg-white rounded-[40px] shadow-sm border border-slate-100 overflow-hidden pr-2">
                 <table className="w-full text-left">
-                    <thead className="bg-slate-50/50 text-[10px] font-black uppercase tracking-widest"><tr className="border-b"><th className="p-8">Responsable</th><th>Base</th><th className="text-right">Ventas</th><th className="p-8 text-center">Estado</th></tr></thead>
+                    <thead className="bg-slate-50/50 text-[10px] font-black uppercase tracking-widest border-b"><tr className="border-b"><th className="p-8">Responsable</th><th>Base</th><th className="text-right">Ventas</th><th className="p-8 text-center">Estado</th></tr></thead>
                     <tbody>{historial.map(t => (<tr key={t.id} className="border-b hover:bg-slate-50 transition">
                         <td className="p-8 font-black">{t.nombre_usuario}</td><td>{fmt(t.base_caja)}</td><td className="text-right font-black text-blue-600">{fmt(t.total_vendido)}</td><td className="p-8 text-center uppercase text-[10px] font-black">{t.estado}</td>
                     </tr>))}</tbody>
@@ -347,7 +347,7 @@ function InventarioView({ user }) {
                 <thead className="bg-slate-50/50 text-[10px] font-black uppercase tracking-widest border-b"><tr><th className="p-8">Producto</th><th>SKU</th><th>Precio</th><th>Stock</th><th className="p-8 text-center">Estado</th></tr></thead>
                 <tbody>{productos.map(p=>(<tr key={p.id} className="border-b hover:bg-slate-50 transition">
                     <td className="p-8 font-black text-slate-800">{p.nombre}</td><td className="font-mono text-slate-400 font-bold">{p.sku}</td><td className="font-black text-slate-700">{fmt(p.precio)}</td><td className="font-black text-slate-800">{p.stock}</td>
-                    <td className="p-8 text-center">{p.stock <= p.min_stock ? <span className="bg-red-50 text-red-600 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-[1px]">Crítico</span> : <span className="bg-green-50 text-green-700 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-[1px]">Disponible</span>}</td>
+                    <td className="p-8 text-center">{p.stock <= p.min_stock ? <span className="bg-red-50 text-red-600 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-[1px]">Crítico</span> : <span className="bg-green-100 text-green-700 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-[1px]">Disponible</span>}</td>
                 </tr>))}</tbody>
             </table>
         </div>
