@@ -1,15 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
-import jsPDF from 'jspdf'; // <--- Corregido a minúsculas
+import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import { 
-  LayoutDashboard, Package, ShoppingCart, Users, Search, DollarSign, 
-  AlertTriangle, TrendingUp, Edit, X, Wallet, Clock, Lock, CreditCard, 
-  Banknote, Landmark, Upload, Mail, Calculator, DownloadCloud, ScanBarcode, 
-  Plus, ChevronRight
-} from 'lucide-react'; // <--- Añadido 'Upload' aquí
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+  LayoutDashboard, Package, ShoppingCart, Users, DollarSign, 
+  AlertTriangle, Wallet, Lock, Mail, Calculator, ScanBarcode, Upload
+} from 'lucide-react';
+import { BarChart, Bar, XAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 axios.defaults.headers.common['ngrok-skip-browser-warning'] = 'true';
 axios.defaults.baseURL = window.location.origin + '/api';
@@ -46,19 +44,14 @@ const imprimirFactura = (cart, total, responsable, metodo, cliente, recibido, ca
     } catch (e) { console.error(e); }
 };
 
-// ==========================================
-//           COMPONENTE PRINCIPAL
-// ==========================================
 function App() {
   const [user, setUser] = useState(null);
   const [isRegistering, setIsRegistering] = useState(false);
-
   if (!user) {
     return isRegistering ? 
       <RegisterScreen onBack={() => setIsRegistering(false)} /> : 
       <LoginScreen onLogin={setUser} onGoToRegister={() => setIsRegistering(true)} />;
   }
-
   return (
     <div className="font-sans text-slate-600 bg-slate-50 min-h-screen">
       <Dashboard user={user} onLogout={() => setUser(null)} />
@@ -81,12 +74,12 @@ function RegisterScreen({ onBack }) {
             <div className="bg-white p-10 rounded-[40px] shadow-2xl w-full max-w-md">
                 <h2 className="text-3xl font-black mb-2 text-slate-800 tracking-tighter">Nueva Cuenta</h2>
                 <form onSubmit={handleRegister} className="space-y-4">
-                    <input className="w-full p-4 border rounded-2xl bg-slate-50" placeholder="Nombre Empresa" onChange={e => setForm({...form, nombre: e.target.value})} required />
-                    <input className="w-full p-4 border rounded-2xl bg-slate-50" type="email" placeholder="Email" onChange={e => setForm({...form, email: e.target.value})} required />
-                    <input className="w-full p-4 border rounded-2xl bg-slate-50" type="password" placeholder="Contraseña" onChange={e => setForm({...form, password: e.target.value})} required />
+                    <input className="w-full p-4 border rounded-2xl bg-slate-50 font-bold" placeholder="Nombre Empresa" onChange={e => setForm({...form, nombre: e.target.value})} required />
+                    <input className="w-full p-4 border rounded-2xl bg-slate-50 font-bold" type="email" placeholder="Email" onChange={e => setForm({...form, email: e.target.value})} required />
+                    <input className="w-full p-4 border rounded-2xl bg-slate-50 font-bold" type="password" placeholder="Contraseña" onChange={e => setForm({...form, password: e.target.value})} required />
                     <button className="w-full bg-blue-600 text-white font-black py-4 rounded-2xl shadow-xl">REGISTRARME</button>
                 </form>
-                <button onClick={onBack} className="w-full mt-4 text-slate-400 font-bold text-sm">Volver al Login</button>
+                <button onClick={onBack} className="w-full mt-4 text-slate-400 font-bold text-sm">Volver</button>
             </div>
         </div>
     );
@@ -110,7 +103,7 @@ function LoginScreen({ onLogin, onGoToRegister }) {
         <form onSubmit={handle} className="space-y-4">
           <input className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold" value={email} onChange={e => setEmail(e.target.value)} placeholder="Email" />
           <input type="password" className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold" value={password} onChange={e => setPassword(e.target.value)} placeholder="Contraseña" />
-          <button className="w-full bg-slate-900 text-white font-black py-4 rounded-2xl shadow-xl hover:bg-black transition-all">INGRESAR</button>
+          <button className="w-full bg-slate-900 text-white font-black py-4 rounded-2xl shadow-xl">INGRESAR</button>
         </form>
         <button onClick={onGoToRegister} className="w-full mt-8 text-blue-600 font-black text-sm hover:underline">REGISTRAR EMPRESA</button>
       </div>
@@ -240,12 +233,14 @@ function VentasView({ user, turnoActivo }) {
   useEffect(() => { load(); }, [load]);
   const totalVenta = cart.reduce((sum, p) => sum + (p.precio * p.cantidad), 0);
   const devuelta = (parseFloat(pagaCon) || 0) - totalVenta;
-  const addToCart = (prod) => {
+  
+  const addToCart = useCallback((prod) => {
       const existe = cart.find(item => item.id === prod.id);
-      if (existe) { setCart(cart.map(item => item.id === prod.id ? { ...item, cantidad: item.cantidad + 1 } : item)); } 
-      else { setCart([...cart, { ...prod, cantidad: 1 }]); }
+      if (existe) { setCart(prev => prev.map(item => item.id === prod.id ? { ...item, cantidad: item.cantidad + 1 } : item)); } 
+      else { setCart(prev => [...prev, { ...prod, cantidad: 1 }]); }
       setSearchTerm('');
-  };
+  }, [cart]);
+
   useEffect(() => {
     let barcode = "";
     const handleKey = (e) => {
@@ -257,7 +252,8 @@ function VentasView({ user, turnoActivo }) {
     };
     window.addEventListener('keypress', handleKey);
     return () => window.removeEventListener('keypress', handleKey);
-  }, [productos, cart]);
+  }, [productos, addToCart]);
+
   const procesar = async () => {
       if(cart.length === 0) return window.alert("Carrito vacío.");
       if(metodo === 'Efectivo' && (parseFloat(pagaCon) < totalVenta || !pagaCon)) return window.alert("Dinero insuficiente.");
@@ -292,9 +288,13 @@ function VentasView({ user, turnoActivo }) {
         <div className="bg-white p-8 rounded-[40px] shadow-xl border flex flex-col justify-between">
             <div className="space-y-6">
                 <div className="text-center"><p className="text-xs font-black text-slate-400">TOTAL</p><h1 className="text-5xl font-black text-blue-600">{fmt(totalVenta)}</h1></div>
-                <div className="flex gap-2"><button onClick={()=>setMetodo('Efectivo')} className={`flex-1 p-3 rounded-2xl font-bold border ${metodo==='Efectivo'?'bg-green-50 border-green-500 text-green-700':'bg-white'}`}>EFECTIVO</button><button onClick={()=>setMetodo('Transferencia')} className={`flex-1 p-3 rounded-2xl font-bold border ${metodo==='Transferencia'?'bg-blue-50 border-blue-300 text-blue-700':'bg-white'}`}>BANCO</button></div>
+                <div className="flex gap-2">
+                    <button onClick={()=>setMetodo('Efectivo')} className={`flex-1 p-3 rounded-2xl font-bold border ${metodo==='Efectivo'?'bg-green-50 border-green-500 text-green-700':'bg-white'}`}>EFECTIVO</button>
+                    <button onClick={()=>setMetodo('Transferencia')} className={`flex-1 p-3 rounded-2xl font-bold border ${metodo==='Transferencia'?'bg-blue-50 border-blue-300 text-blue-700':'bg-white'}`}>BANCO</button>
+                </div>
                 {metodo === 'Efectivo' && <div className="bg-slate-50 p-4 rounded-3xl border-2 border-dashed"><div className="flex justify-between items-center mb-2"><span>Recibido:</span><input type="number" className="w-24 p-2 rounded-xl text-right font-bold" value={pagaCon} onChange={e=>setPagaCon(e.target.value)} /></div><div className="flex justify-between font-black text-blue-600"><span>Cambio:</span><span>{fmt(devuelta)}</span></div></div>}
                 <div className="p-4 bg-slate-900 rounded-3xl text-white flex justify-between items-center cursor-pointer" onClick={()=>setEsElectronica(!esElectronica)}><span className="text-xs font-bold uppercase tracking-widest">Factura Electrónica</span><div className={`w-8 h-4 rounded-full relative ${esElectronica?'bg-blue-500':'bg-slate-700'}`}><div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-all ${esElectronica?'left-4':'left-1'}`}></div></div></div>
+                {esElectronica && <input className="p-3 bg-slate-100 border-none rounded-xl text-xs font-bold text-slate-700" placeholder="Email" onChange={e=>setCliente(prev => ({...prev, email: e.target.value}))} />}
             </div>
             <button onClick={procesar} className="w-full bg-blue-600 text-white font-black py-5 rounded-3xl shadow-xl mt-6">PAGAR</button>
         </div>
@@ -348,7 +348,7 @@ function NominaView({ user }) {
   const [formEmp, setFormEmp] = useState({ nombre: '', email: '', salario: '', eps: '', arl: '', pension: '' });
   const [formLiq, setFormLiq] = useState({ empleado_id: '', dias: 30, extras: 0, tipo_extra: 'Diurna', metodo: 'Transferencia', banco: '', cuenta: '' });
   const [preview, setPreview] = useState(null);
-  const load = useCallback(() => { axios.get('/empleados').then(res => setEmpleados(res.data)); axios.get('/nomina/historial').then(res => setNominas(res.data)); }, []);
+  const load = useCallback(() => { axios.get('/api/empleados').then(res => setEmpleados(res.data)); axios.get('/api/nomina/historial').then(res => setNominas(res.data)); }, []);
   useEffect(() => { load(); }, [load]);
   const calcular = () => {
     const e = empleados.find(emp => emp.id === parseInt(formLiq.empleado_id)); if(!e) return;
@@ -364,14 +364,14 @@ function NominaView({ user }) {
       <div className="flex gap-4 p-2 bg-white border rounded-3xl w-fit shadow-sm">{['liquidar', 'empleados', 'history'].map(m => <button key={m} onClick={()=>setMode(m)} className={`px-8 py-3 rounded-2xl font-black text-[10px] uppercase ${mode===m?'bg-blue-600 text-white shadow-xl':'text-slate-400'}`}>{m}</button>)}</div>
       {mode === 'empleados' && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div className="bg-white p-10 rounded-[40px] shadow-sm border border-slate-100"><h3 className="font-black text-xl mb-8 tracking-tighter">Vinculación</h3><form onSubmit={async (e)=>{e.preventDefault(); await axios.post('/empleados', formEmp); load(); setFormEmp({nombre:'',email:'',salario:'',eps:'',arl:'',pension:''});}} className="space-y-4"><input className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold" placeholder="Nombre" value={formEmp.nombre} onChange={e=>setFormEmp({...formEmp, nombre: e.target.value})} required/><input className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold" type="email" placeholder="Email" value={formEmp.email} onChange={e=>setFormEmp({...formEmp, email: e.target.value})} required/><input className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold" type="number" placeholder="Salario" value={formEmp.salario} onChange={e=>setFormEmp({...formEmp, salario: e.target.value})} required/><div className="grid grid-cols-3 gap-2"><input className="p-3 bg-slate-50 border-none rounded-xl text-[10px] uppercase" placeholder="EPS" value={formEmp.eps} onChange={e=>setFormEmp({...formEmp, eps: e.target.value})}/><input className="p-3 bg-slate-50 border-none rounded-xl text-[10px] uppercase" placeholder="ARL" value={formEmp.arl} onChange={e=>setFormEmp({...formEmp, arl: e.target.value})}/><input className="p-3 bg-slate-50 border-none rounded-xl text-[10px] uppercase" placeholder="F.P" value={formEmp.pension} onChange={e=>setFormEmp({...formEmp, pension: e.target.value})}/></div><button className="w-full bg-blue-600 text-white font-black py-4 rounded-2xl shadow-xl">VINCULAR</button></form></div>
+            <div className="bg-white p-10 rounded-[40px] shadow-sm border border-slate-100"><h3 className="font-black text-xl mb-8 tracking-tighter">Vinculación</h3><form onSubmit={async (e)=>{e.preventDefault(); await axios.post('/api/empleados', formEmp); load(); setFormEmp({nombre:'',email:'',salario:'',eps:'',arl:'',pension:''});}} className="space-y-4"><input className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold" placeholder="Nombre" value={formEmp.nombre} onChange={e=>setFormEmp({...formEmp, nombre: e.target.value})} required/><input className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold" type="email" placeholder="Email" value={formEmp.email} onChange={e=>setFormEmp({...formEmp, email: e.target.value})} required/><input className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold" type="number" placeholder="Salario" value={formEmp.salario} onChange={e=>setFormEmp({...formEmp, salario: e.target.value})} required/><div className="grid grid-cols-3 gap-2"><input className="p-3 bg-slate-50 border-none rounded-xl text-[10px] uppercase" placeholder="EPS" value={formEmp.eps} onChange={e=>setFormEmp({...formEmp, eps: e.target.value})}/><input className="p-3 bg-slate-50 border-none rounded-xl text-[10px] uppercase" placeholder="ARL" value={formEmp.arl} onChange={e=>setFormEmp({...formEmp, arl: e.target.value})}/><input className="p-3 bg-slate-50 border-none rounded-xl text-[10px] uppercase" placeholder="F.P" value={formEmp.pension} onChange={e=>setFormEmp({...formEmp, pension: e.target.value})}/></div><button className="w-full bg-blue-600 text-white font-black py-4 rounded-2xl shadow-xl">VINCULAR</button></form></div>
             <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4 h-fit pr-2">{empleados.map(e=>(<div key={e.id} className="bg-white p-6 rounded-[32px] shadow-sm border border-slate-100 flex items-center gap-6"><div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center font-black text-2xl text-blue-600">{e.nombre.charAt(0)}</div><div className="overflow-hidden"><p className="font-black text-slate-800 text-lg tracking-tighter truncate">{e.nombre}</p><p className="text-xl font-black text-green-600 mt-1">{fmt(e.salario)}</p></div></div>))}</div>
         </div>
       )}
       {mode === 'liquidar' && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
               <div className="bg-white p-12 rounded-[40px] shadow-xl border border-green-100"><h3 className="font-black text-xl mb-8 tracking-tighter flex items-center gap-3"><Calculator/> LIQUIDADOR</h3><div className="space-y-6"><div><label className="text-[10px] font-black uppercase text-slate-400 ml-4 block mb-2">Empleado</label><select className="w-full p-5 bg-slate-50 border-none rounded-3xl font-black" onChange={e=>setFormLiq({...formLiq, empleado_id: e.target.value})}><option>-- Seleccionar --</option>{empleados.map(e=><option key={e.id} value={e.id}>{e.nombre}</option>)}</select></div><div className="grid grid-cols-2 gap-6"><div><label className="text-[10px] font-black uppercase text-slate-400 ml-4">Días</label><input type="number" className="w-full p-5 bg-slate-50 border-none rounded-3xl font-black" value={formLiq.dias} onChange={e=>setFormLiq({...formLiq, dias: e.target.value})}/></div><div><label className="text-[10px] font-black uppercase text-slate-400 ml-4">Extras</label><input type="number" className="w-full p-5 bg-slate-50 border-none rounded-3xl font-black" value={formLiq.extras} onChange={e=>setFormLiq({...formLiq, extras: e.target.value})}/></div></div><div><label className="text-[10px] font-black uppercase text-slate-400 ml-4">Tipo Recargo</label><select className="w-full p-5 bg-slate-50 border-none rounded-3xl font-black" value={formLiq.tipo_extra} onChange={e=>setFormLiq({...formLiq, tipo_extra: e.target.value})}><option value="Diurna">Diurna</option><option value="Nocturna">Nocturna</option><option value="Dominical">Dominical</option><option value="Recargo_Nocturno">Recargo</option></select></div><button onClick={calcular} className="w-full bg-slate-900 text-white font-black py-5 rounded-3xl shadow-xl hover:bg-black transition-all">CALCULAR</button></div></div>
-              <div className="bg-white p-12 rounded-[40px] shadow-2xl border-l-[12px] border-blue-600 flex flex-col justify-between">{preview ? (<div className="space-y-6 animate-fade-in"><div className="text-center border-b pb-8"><h4 className="text-3xl font-black text-slate-800 tracking-tighter">{preview.nombre}</h4></div><div className="bg-blue-600 p-8 rounded-[32px] text-center text-5xl font-black text-white">{fmt(preview.neto)}</div><button onClick={async ()=>{if(window.confirm(`¿Confirmar pago?`)){await axios.post('/nomina/liquidar', {...formLiq, extras: formLiq.extras, responsable: user.nombre}); window.alert("Éxito"); load(); setMode('history'); setPreview(null);}}} className="w-full bg-slate-900 text-white font-black py-6 rounded-[32px] shadow-xl hover:scale-102 transition-all">PAGAR</button></div>) : <div className="h-full flex items-center justify-center opacity-20"><Mail size={100}/></div>}</div>
+              <div className="bg-white p-12 rounded-[40px] shadow-2xl border-l-[12px] border-blue-600 flex flex-col justify-between">{preview ? (<div className="space-y-6 animate-fade-in"><div className="text-center border-b pb-8"><h4 className="text-3xl font-black text-slate-800 tracking-tighter">{preview.nombre}</h4></div><div className="bg-blue-600 p-8 rounded-[32px] text-center text-5xl font-black text-white">{fmt(preview.neto)}</div><button onClick={async ()=>{if(window.confirm(`¿Confirmar pago?`)){await axios.post('/api/nomina/liquidar', {...formLiq, extras: formLiq.extras, responsable: user.nombre}); window.alert("Éxito"); load(); setMode('history'); setPreview(null);}}} className="w-full bg-slate-900 text-white font-black py-6 rounded-[32px] shadow-xl hover:scale-102 transition-all">PAGAR</button></div>) : <div className="h-full flex items-center justify-center opacity-20"><Mail size={100}/></div>}</div>
           </div>
       )}
       {mode === 'history' && (
@@ -387,7 +387,7 @@ function ContabilidadView() {
     const [balance, setBalance] = useState([]);
     const loadData = useCallback(async () => {
         try {
-            const [resDiario, resBalance] = await Promise.all([ axios.get('/contabilidad/diario'), axios.get('/contabilidad/balance') ]);
+            const [resDiario, resBalance] = await Promise.all([ axios.get('/api/contabilidad/diario'), axios.get('/api/contabilidad/balance') ]);
             setDiario(Array.isArray(resDiario.data) ? resDiario.data : []);
             setBalance(Array.isArray(resBalance.data) ? resBalance.data : []);
         } catch (e) { console.error(e); }
