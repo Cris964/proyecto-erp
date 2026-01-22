@@ -13,10 +13,15 @@ const dbConfig = {
     user: process.env.DB_USER,
     password: process.env.DB_PASSWORD, 
     database: process.env.DB_NAME,
-    port: process.env.DB_PORT,
-    ssl: { rejectUnauthorized: false } 
+    port: Number(process.env.DB_PORT), // Asegura que sea un número
+    ssl: { 
+        rejectUnauthorized: false 
+    },
+    // Añadimos esto para compatibilidad con MySQL 8 en la nube
+    connectTimeout: 10000,
+    enableKeepAlive: true,
+    keepAliveInitialDelay: 0
 };
-const pool = mysql.createPool(dbConfig);
 
 // 2. CONFIGURACIÓN CORREO
 const transporter = nodemailer.createTransport({
