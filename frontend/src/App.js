@@ -15,9 +15,6 @@ axios.defaults.baseURL = window.location.origin + '/api';
 
 const fmt = (number) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(number || 0);
 
-// ==========================================
-//    FUNCIÓN GLOBAL: IMPRESIÓN DE FACTURA
-// ==========================================
 const imprimirFactura = (cart, total, responsable, metodo, cliente, recibido, cambio) => {
     try {
         const doc = new jsPDF({ unit: 'mm', format: [80, 150 + (cart.length * 10)] }); 
@@ -78,7 +75,7 @@ function RegisterScreen({ onBack }) {
                     <input className="w-full p-4 border rounded-2xl bg-slate-50 font-bold" placeholder="Nombre Empresa" value={form.nombre} onChange={e => setForm({...form, nombre: e.target.value})} required />
                     <input className="w-full p-4 border rounded-2xl bg-slate-50 font-bold" type="email" placeholder="Email" value={form.email} onChange={e => setForm({...form, email: e.target.value})} required />
                     <input className="w-full p-4 border rounded-2xl bg-slate-50 font-bold" type="password" placeholder="Contraseña" value={form.password} onChange={e => setForm({...form, password: e.target.value})} required />
-                    <button className="w-full bg-blue-600 text-white font-black py-4 rounded-2xl">REGISTRARME</button>
+                    <button className="w-full bg-blue-600 text-white font-black py-4 rounded-2xl shadow-xl">REGISTRARME</button>
                 </form>
                 <button onClick={onBack} className="w-full mt-4 text-slate-400 font-bold text-sm">Volver</button>
             </div>
@@ -104,9 +101,9 @@ function LoginScreen({ onLogin, onGoToRegister }) {
         <form onSubmit={handle} className="space-y-4">
           <input className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold" value={email} onChange={e => setEmail(e.target.value)} placeholder="Email" />
           <input type="password" className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold" value={password} onChange={e => setPassword(e.target.value)} placeholder="Contraseña" />
-          <button className="w-full bg-slate-900 text-white font-black py-4 rounded-2xl shadow-xl">INGRESAR</button>
+          <button className="w-full bg-slate-900 text-white font-black py-4 rounded-2xl shadow-xl hover:bg-black transition-all">INGRESAR</button>
         </form>
-        <button onClick={onGoToRegister} className="w-full mt-8 text-blue-600 font-black text-sm hover:underline">REGISTRAR EMPRESA</button>
+        <button onClick={onGoToRegister} className="w-full mt-8 text-blue-600 font-black text-sm hover:underline tracking-tight">REGISTRAR NUEVA EMPRESA</button>
       </div>
     </div>
   );
@@ -122,7 +119,7 @@ function Dashboard({ user, onLogout }) {
   return (
     <div className="flex h-screen overflow-hidden bg-slate-50">
       <aside className="w-72 bg-white border-r flex flex-col z-20 shadow-xl px-6">
-        <div className="h-28 flex items-center font-black text-2xl text-slate-800 uppercase tracking-tighter italic">ACCUCLOUD <span className="text-blue-600">.</span></div>
+        <div className="h-28 flex items-center font-black text-2xl text-slate-800 tracking-tighter italic uppercase">ACCUCLOUD <span className="text-blue-600">.</span></div>
         <nav className="flex-1 space-y-1 overflow-y-auto">
           <MenuButton icon={<LayoutDashboard size={20}/>} label="Dashboard" active={activeTab==='dashboard'} onClick={()=>setActiveTab('dashboard')} />
           <div className="px-4 text-[10px] font-black text-slate-300 uppercase mt-8 mb-4 tracking-[2px]">Operaciones</div>
@@ -133,13 +130,13 @@ function Dashboard({ user, onLogout }) {
           <MenuButton icon={<Users size={20}/>} label="Nómina PRO" active={activeTab==='nomina'} onClick={()=>setActiveTab('nomina')} />
           <MenuButton icon={<Calculator size={20}/>} label="Contabilidad" active={activeTab==='conta'} onClick={()=>setActiveTab('conta')} />
         </nav>
-        <div className="py-8 border-t">
+        <div className="py-8 border-t space-y-4">
             <button onClick={onLogout} className="w-full text-red-500 text-xs font-black py-2 hover:bg-red-50 rounded-xl transition">CERRAR SESIÓN</button>
         </div>
       </aside>
       <main className="flex-1 overflow-auto p-10">
         <header className="flex justify-between items-center mb-10">
-            <h2 className="text-4xl font-black text-slate-800 tracking-tighter capitalize">{activeTab}</h2>
+            <div><h2 className="text-4xl font-black text-slate-800 tracking-tighter capitalize">{activeTab}</h2></div>
             {turnoActivo ? <div className="px-4 py-2 bg-green-100 text-green-700 rounded-xl text-xs font-black flex items-center gap-2 shadow-sm"><div className="w-2 bg-green-500 h-2 rounded-full animate-pulse"></div> CAJA ABIERTA</div> : <div className="px-4 py-2 bg-red-100 text-red-700 rounded-xl text-xs font-black">CAJA CERRADA</div>}
         </header>
         {activeTab==='dashboard' && <ResumenView/>}
@@ -167,7 +164,7 @@ function ResumenView() {
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           <div className="bg-white p-10 rounded-[40px] shadow-sm border border-slate-100 h-96">
-              <h3 className="font-black text-slate-800 mb-6">Desempeño Semanal</h3>
+              <h3 className="font-black text-slate-800 mb-6 tracking-tight">Desempeño Semanal</h3>
               <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={chartData}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9"/>
@@ -201,18 +198,18 @@ function CajaView({ user, turnoActivo, onUpdate }) {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-fade-in">
             <div className="bg-white p-10 rounded-[40px] shadow-xl border border-blue-50 text-center flex flex-col justify-center">
                 <div className={`w-24 h-24 mx-auto rounded-[32px] flex items-center justify-center mb-8 ${turnoActivo ? 'bg-green-50 text-green-500' : 'bg-red-50 text-red-500'}`}>{turnoActivo ? <ScanBarcode size={48}/> : <Lock size={48}/>}</div>
-                <h3 className="text-3xl font-black mb-2">{turnoActivo ? "CAJA ABIERTA" : "CAJA CERRADA"}</h3>
-                {turnoActivo && <div className="bg-slate-50 p-6 rounded-3xl mb-8 text-left font-black tracking-tight">Ventas Hoy: <span className="text-green-600">{fmt(turnoActivo.total_vendido)}</span></div>}
+                <h3 className="text-3xl font-black mb-2 tracking-tighter">{turnoActivo ? "CAJA ABIERTA" : "CAJA CERRADA"}</h3>
+                {turnoActivo && <div className="bg-slate-50 p-6 rounded-3xl mb-8 text-left font-black tracking-tight italic">Ventas Hoy: <span className="text-green-600">{fmt(turnoActivo.total_vendido)}</span></div>}
                 <button onClick={async ()=>{
                     if(turnoActivo){ if(window.confirm("¿Cerrar?")) { await axios.put('/turnos/finalizar', { turno_id: turnoActivo.id }); onUpdate(); loadHistorial(); } }
-                    else { const b = window.prompt("Base?", "0"); if(b) { await axios.post('/turnos/iniciar', { usuario_id: user.id, nombre_usuario: user.nombre, base_caja: b }); onUpdate(); loadHistorial(); } }
-                }} className={`w-full py-5 rounded-3xl font-black text-white ${turnoActivo ? 'bg-red-500' : 'bg-blue-600'}`}>
+                    else { const b = window.prompt("Base Inicial?", "0"); if(b) { await axios.post('/turnos/iniciar', { usuario_id: user.id, nombre_usuario: user.nombre, base_caja: b }); onUpdate(); loadHistorial(); } }
+                }} className={`w-full py-5 rounded-3xl font-black text-white ${turnoActivo ? 'bg-red-500 shadow-xl shadow-red-100' : 'bg-blue-600 shadow-xl shadow-blue-100'} transition-all active:scale-95`}>
                     {turnoActivo ? "REALIZAR CIERRE" : "ABRIR NUEVA CAJA"}
                 </button>
             </div>
-            <div className="lg:col-span-2 bg-white rounded-[40px] shadow-sm border border-slate-100 overflow-hidden pr-2">
+            <div className="lg:col-span-2 bg-white rounded-[40px] shadow-sm border border-slate-100 overflow-hidden">
                 <table className="w-full text-left">
-                    <thead className="bg-slate-50/50 text-[10px] font-black uppercase"><tr className="border-b"><th className="p-8">Responsable</th><th>Base</th><th className="text-right">Ventas</th><th className="p-8 text-center">Estado</th></tr></thead>
+                    <thead className="bg-slate-50/50 text-[10px] font-black uppercase tracking-widest"><tr className="border-b"><th className="p-8">Responsable</th><th>Base</th><th className="text-right">Ventas</th><th className="p-8 text-center">Estado</th></tr></thead>
                     <tbody>{historial.map(t => (<tr key={t.id} className="border-b hover:bg-slate-50 transition">
                         <td className="p-8 font-black">{t.nombre_usuario}</td><td>{fmt(t.base_caja)}</td><td className="text-right font-black text-blue-600">{fmt(t.total_vendido)}</td><td className="p-8 text-center uppercase text-[10px] font-black">{t.estado}</td>
                     </tr>))}</tbody>
@@ -229,18 +226,20 @@ function VentasView({ user, turnoActivo }) {
   const [metodo, setMetodo] = useState('Efectivo');
   const [pagaCon, setPagaCon] = useState('');
   const [esElectronica, setEsElectronica] = useState(false);
-  const [cliente, setCliente] = useState({ email: '' });
+  const [cliente, setCliente] = useState({ nombre: '', nit: '', email: '', tel: '' });
   const load = useCallback(() => axios.get('/productos').then(res => setProductos(res.data)), []);
   useEffect(() => { load(); }, [load]);
   const totalVenta = cart.reduce((sum, p) => sum + (p.precio * p.cantidad), 0);
   const devuelta = (parseFloat(pagaCon) || 0) - totalVenta;
   
   const addToCart = useCallback((prod) => {
-      const existe = cart.find(item => item.id === prod.id);
-      if (existe) { setCart(prev => prev.map(item => item.id === prod.id ? { ...item, cantidad: item.cantidad + 1 } : item)); } 
-      else { setCart(prev => [...prev, { ...prod, cantidad: 1 }]); }
+      setCart(prev => {
+        const existe = prev.find(item => item.id === prod.id);
+        if (existe) { return prev.map(item => item.id === prod.id ? { ...item, cantidad: item.cantidad + 1 } : item); } 
+        else { return [...prev, { ...prod, cantidad: 1 }]; }
+      });
       setSearchTerm('');
-  }, [cart]);
+  }, []);
 
   useEffect(() => {
     let barcode = "";
@@ -261,43 +260,44 @@ function VentasView({ user, turnoActivo }) {
       try {
           const res = await axios.post('/ventas', {
               productos: cart, responsable: user.nombre, turno_id: turnoActivo.id, metodo_pago: metodo,
-              es_electronica: esElectronica, cliente: esElectronica ? cliente : null, pago_recibido: pagaCon, cambio: devuelta
+              es_electronica: esElectronica, cliente: esElectronica ? cliente : {nombre: 'General', nit: '222'}, pago_recibido: pagaCon, cambio: devuelta
           });
           if(res.data.success) {
               imprimirFactura(cart, totalVenta, user.nombre, metodo, cliente, pagaCon, devuelta);
-              setCart([]); setPagaCon(''); setEsElectronica(false);
-              window.alert("Venta procesada."); load();
+              setCart([]); setPagaCon(''); setEsElectronica(false); setSearchTerm('');
+              window.alert("Completado."); load();
           }
       } catch (e) { window.alert("Error."); }
   };
+
   if(!turnoActivo) return <div className="text-center p-20 opacity-30"><h2>CAJA CERRADA</h2></div>;
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-fade-in">
         <div className="lg:col-span-2 bg-white p-8 rounded-[40px] shadow-xl border border-blue-50">
-            <h3 className="font-black text-2xl mb-6 flex items-center gap-3 tracking-tighter"><ScanBarcode className="text-blue-600"/> TPV 2026</h3>
-            <input autoFocus className="w-full p-4 border rounded-2xl bg-slate-50 font-bold mb-6" placeholder="Escanea o busca..." value={searchTerm} onChange={e=>setSearchTerm(e.target.value)} />
-            {searchTerm && <div className="absolute bg-white border rounded-2xl shadow-2xl z-50 p-4 w-1/2 mt-[-20px]">{productos.filter(p=>p.nombre.toLowerCase().includes(searchTerm.toLowerCase()) || p.sku.includes(searchTerm)).map(p=>(<div key={p.id} onClick={()=>addToCart(p)} className="p-2 border-b cursor-pointer hover:bg-blue-50"><b>{p.nombre}</b></div>))}</div>}
+            <h3 className="font-black text-2xl mb-6 flex items-center gap-3 tracking-tighter uppercase"><ScanBarcode className="text-blue-600"/> TPV 2026</h3>
+            <input autoFocus className="w-full p-4 border rounded-2xl bg-slate-50 font-bold mb-6 focus:ring-2 ring-blue-100 outline-none" placeholder="Escanea o busca producto..." value={searchTerm} onChange={e=>setSearchTerm(e.target.value)} />
+            {searchTerm && <div className="absolute bg-white border rounded-2xl shadow-2xl z-50 p-4 w-1/2 mt-[-20px] max-h-60 overflow-auto">{productos.filter(p=>p.nombre.toLowerCase().includes(searchTerm.toLowerCase()) || p.sku.includes(searchTerm)).map(p=>(<div key={p.id} onClick={()=>addToCart(p)} className="p-3 border-b cursor-pointer hover:bg-blue-50 font-black transition-all text-slate-700">{p.nombre}</div>))}</div>}
             <div className="max-h-[300px] overflow-auto">
                 <table className="w-full text-left">
                     <thead className="text-[10px] font-black uppercase text-slate-400 border-b"><tr><th className="pb-4">Producto</th><th>Cant</th><th>Subtotal</th><th></th></tr></thead>
                     <tbody>{cart.map((item, i) => (
-                        <tr key={i} className="border-b"><td className="py-4 font-bold">{item.nombre}</td><td><input type="number" className="w-16 border rounded-lg text-center" value={item.cantidad} onChange={(e) => setCart(cart.map(it => it.id === item.id ? { ...it, cantidad: parseInt(e.target.value) || 1 } : it))} /></td><td className="font-black">{fmt(item.precio * item.cantidad)}</td><td><button onClick={()=>setCart(cart.filter(it => it.id !== item.id))} className="text-red-500 font-bold">X</button></td></tr>
+                        <tr key={i} className="border-b"><td className="py-4 font-bold">{item.nombre}</td><td><input type="number" className="w-16 border rounded-lg text-center font-bold" value={item.cantidad} onChange={(e) => {
+                            const val = parseInt(e.target.value) || 1;
+                            setCart(cart.map(it => it.id === item.id ? { ...it, cantidad: val } : it));
+                        }} /></td><td className="font-black">{fmt(item.precio * item.cantidad)}</td><td><button onClick={()=>setCart(cart.filter(it => it.id !== item.id))} className="text-red-500 font-bold hover:bg-red-50 p-2 rounded-xl transition-all">X</button></td></tr>
                     ))}</tbody>
                 </table>
             </div>
         </div>
         <div className="bg-white p-8 rounded-[40px] shadow-xl border flex flex-col justify-between">
             <div className="space-y-6">
-                <div className="text-center"><p className="text-xs font-black text-slate-400">TOTAL</p><h1 className="text-5xl font-black text-blue-600">{fmt(totalVenta)}</h1></div>
-                <div className="flex gap-2">
-                    <button onClick={()=>setMetodo('Efectivo')} className={`flex-1 p-3 rounded-2xl font-bold border ${metodo==='Efectivo'?'bg-green-50 border-green-500 text-green-700':'bg-white'}`}>EFECTIVO</button>
-                    <button onClick={()=>setMetodo('Transferencia')} className={`flex-1 p-3 rounded-2xl font-bold border ${metodo==='Transferencia'?'bg-blue-50 border-blue-300 text-blue-700':'bg-white'}`}>BANCO</button>
-                </div>
-                {metodo === 'Efectivo' && <div className="bg-slate-50 p-4 rounded-3xl border-2 border-dashed"><div className="flex justify-between items-center mb-2"><span>Recibido:</span><input type="number" className="w-24 p-2 rounded-xl text-right font-bold" value={pagaCon} onChange={e=>setPagaCon(e.target.value)} /></div><div className="flex justify-between font-black text-blue-600"><span>Cambio:</span><span>{fmt(devuelta)}</span></div></div>}
-                <div className="p-4 bg-slate-900 rounded-3xl text-white flex justify-between items-center cursor-pointer" onClick={()=>setEsElectronica(!esElectronica)}><span className="text-xs font-bold uppercase tracking-widest">Factura Electrónica</span><div className={`w-8 h-4 rounded-full relative ${esElectronica?'bg-blue-500':'bg-slate-700'}`}><div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-all ${esElectronica?'left-4':'left-1'}`}></div></div></div>
-                {esElectronica && <input className="p-3 bg-slate-100 border-none rounded-xl text-xs font-bold text-slate-700" placeholder="Email" onChange={e=>setCliente({email: e.target.value})} />}
+                <div className="text-center"><p className="text-[10px] font-black uppercase tracking-widest text-slate-300">Total a Cobrar</p><h1 className="text-5xl font-black text-blue-600 tracking-tighter">{fmt(totalVenta)}</h1></div>
+                <div className="flex gap-2"><button onClick={()=>setMetodo('Efectivo')} className={`flex-1 p-3 rounded-2xl font-bold border transition-all ${metodo==='Efectivo'?'bg-green-50 border-green-500 text-green-700 shadow-xl shadow-green-50':'bg-white text-slate-400 border-slate-50'}`}>EFECTIVO</button><button onClick={()=>setMetodo('Transferencia')} className={`flex-1 p-3 rounded-2xl font-bold border transition-all ${metodo==='Transferencia'?'bg-blue-50 border-blue-300 text-blue-700 shadow-xl shadow-blue-50':'bg-white text-slate-400 border-slate-50'}`}>BANCO</button></div>
+                {metodo === 'Efectivo' && <div className="bg-slate-50 p-4 rounded-3xl border-2 border-dashed border-slate-200"><div className="flex justify-between items-center mb-2"><span className="text-xs font-black uppercase text-slate-400">Recibido:</span><input type="number" className="w-24 p-2 rounded-xl text-right font-black text-green-600" value={pagaCon} onChange={e=>setPagaCon(e.target.value)} /></div><div className="flex justify-between font-black text-blue-600 tracking-tighter border-t pt-2 mt-2"><span>Cambio:</span><span>{fmt(devuelta)}</span></div></div>}
+                <div className="p-4 bg-slate-900 rounded-3xl text-white flex justify-between items-center cursor-pointer hover:bg-black transition-all" onClick={()=>setEsElectronica(!esElectronica)}><div className="flex items-center gap-2"><Mail size={16}/><span className="text-[10px] font-black uppercase tracking-widest">Factura Electrónica</span></div><div className={`w-8 h-4 rounded-full relative transition-all ${esElectronica?'bg-blue-500':'bg-slate-700'}`}><div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-all ${esElectronica?'left-4':'left-1'}`}></div></div></div>
+                {esElectronica && <div className="space-y-2 animate-fade-in"><input className="w-full p-3 bg-slate-50 border-none rounded-xl text-xs font-black text-slate-700" placeholder="Nombre/Empresa" onChange={e=>setCliente(prev => ({...prev, nombre: e.target.value}))} /><input className="w-full p-3 bg-slate-50 border-none rounded-xl text-xs font-black text-slate-700" placeholder="NIT" onChange={e=>setCliente(prev => ({...prev, nit: e.target.value}))} /><input className="w-full p-3 bg-slate-50 border-none rounded-xl text-xs font-black text-slate-700" placeholder="Email" onChange={e=>setCliente(prev => ({...prev, email: e.target.value}))} /></div>}
             </div>
-            <button onClick={procesar} className="w-full bg-blue-600 text-white font-black py-5 rounded-3xl shadow-xl mt-6">PAGAR</button>
+            <button onClick={procesar} className="w-full bg-blue-600 text-white font-black py-5 rounded-[28px] shadow-2xl shadow-blue-100 hover:scale-[1.03] transition-all active:scale-95 text-xl tracking-tight mt-6">PAGAR</button>
         </div>
     </div>
   );
@@ -327,15 +327,24 @@ function InventarioView({ user }) {
     <div className="space-y-10 animate-fade-in">
         <div className="bg-white p-10 rounded-[40px] shadow-sm border border-slate-100">
             <div className="flex justify-between items-center mb-8">
-                <h3 className="font-black text-xl tracking-tighter">Inventario</h3>
-                <label className="bg-slate-900 text-white px-6 py-3 rounded-2xl font-black text-[10px] cursor-pointer hover:bg-black flex items-center gap-2 shadow-xl"><Upload size={14}/> EXCEL<input type="file" accept=".xlsx, .xls, .csv" onChange={handleImportExcel} className="hidden" /></label>
+                <h3 className="font-black text-xl tracking-tighter">Gestión de Stock</h3>
+                <label className="bg-slate-900 text-white px-6 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest cursor-pointer hover:bg-black flex items-center gap-2 shadow-xl shadow-slate-100"><Upload size={14} className="text-blue-500"/> Carga Masiva<input type="file" accept=".xlsx, .xls, .csv" onChange={handleImportExcel} className="hidden" /></label>
             </div>
-            <form onSubmit={async (e)=>{e.preventDefault(); await axios.post('/productos', {...form, responsable: user.nombre}); load(); setForm({nombre:'',sku:'',precio:'',stock:'',min_stock:5});}} className="grid grid-cols-5 gap-4"><input className="p-4 bg-slate-50 border-none rounded-2xl font-bold" placeholder="Nombre" value={form.nombre} onChange={e=>setForm({...form, nombre: e.target.value})} required/><input className="p-4 bg-slate-50 border-none rounded-2xl font-bold" placeholder="SKU" value={form.sku} onChange={e=>setForm({...form, sku: e.target.value})} required/><input className="p-4 bg-slate-50 border-none rounded-2xl font-bold" type="number" placeholder="Precio" value={form.precio} onChange={e=>setForm({...form, precio: e.target.value})} required/><input className="p-4 bg-slate-50 border-none rounded-2xl font-bold" type="number" placeholder="Stock" value={form.stock} onChange={e=>setForm({...form, stock: e.target.value})} required/><button className="bg-blue-600 text-white font-black rounded-2xl">GUARDAR</button></form>
+            <form onSubmit={async (e)=>{e.preventDefault(); await axios.post('/productos', {...form, responsable: user.nombre}); load(); setForm({nombre:'',sku:'',precio:'',stock:'',min_stock:5});}} className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                <input className="p-4 bg-slate-50 border-none rounded-2xl font-bold" placeholder="Nombre" value={form.nombre} onChange={e=>setForm({...form, nombre: e.target.value})} required/>
+                <input className="p-4 bg-slate-50 border-none rounded-2xl font-bold" placeholder="Código Barras" value={form.sku} onChange={e=>setForm({...form, sku: e.target.value})} required/>
+                <input className="p-4 bg-slate-50 border-none rounded-2xl font-bold" type="number" placeholder="Precio" value={form.precio} onChange={e=>setForm({...form, precio: e.target.value})} required/>
+                <input className="p-4 bg-slate-50 border-none rounded-2xl font-bold" type="number" placeholder="Stock" value={form.stock} onChange={e=>setForm({...form, stock: e.target.value})} required/>
+                <button className="bg-blue-600 text-white font-black rounded-2xl shadow-xl shadow-blue-100 hover:brightness-110 transition-all">CREAR</button>
+            </form>
         </div>
-        <div className="bg-white rounded-[40px] shadow-sm overflow-hidden border border-slate-100 pr-2">
+        <div className="bg-white rounded-[40px] shadow-sm overflow-hidden border border-slate-100">
             <table className="w-full text-left">
                 <thead className="bg-slate-50/50 text-[10px] font-black uppercase tracking-widest border-b"><tr><th className="p-8">Producto</th><th>SKU</th><th>Precio</th><th>Stock</th><th className="p-8 text-center">Estado</th></tr></thead>
-                <tbody>{productos.map(p=>(<tr key={p.id} className="border-b hover:bg-slate-50 transition"><td className="p-8 font-black text-slate-800">{p.nombre}</td><td className="font-mono text-slate-400">{p.sku}</td><td className="font-black text-slate-700">{fmt(p.precio)}</td><td className="font-black text-slate-800">{p.stock}</td><td className="p-8 text-center">{p.stock <= p.min_stock ? <span className="bg-red-100 text-red-600 px-4 py-1.5 rounded-full text-[10px] font-black">CRÍTICO</span> : <span className="bg-green-100 text-green-700 px-4 py-1.5 rounded-full text-[10px] font-black">OK</span>}</td></tr>))}</tbody>
+                <tbody>{productos.map(p=>(<tr key={p.id} className="border-b hover:bg-slate-50 transition">
+                    <td className="p-8 font-black text-slate-800">{p.nombre}</td><td className="font-mono text-slate-400">{p.sku}</td><td className="font-black text-slate-700">{fmt(p.precio)}</td><td className="font-black text-slate-800">{p.stock}</td>
+                    <td className="p-8 text-center">{p.stock <= p.min_stock ? <span className="bg-red-50 text-red-600 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-[1px]">Crítico</span> : <span className="bg-green-50 text-green-700 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-[1px]">Disponible</span>}</td>
+                </tr>))}</tbody>
             </table>
         </div>
     </div>
@@ -362,21 +371,21 @@ function NominaView({ user }) {
   };
   return (
     <div className="space-y-10 animate-fade-in">
-      <div className="flex gap-4 p-2 bg-white border rounded-3xl w-fit shadow-sm">{['liquidar', 'empleados', 'history'].map(m => <button key={m} onClick={()=>setMode(m)} className={`px-8 py-3 rounded-2xl font-black text-[10px] uppercase ${mode===m?'bg-blue-600 text-white shadow-xl':'text-slate-400'}`}>{m}</button>)}</div>
+      <div className="flex gap-4 p-2 bg-white border rounded-3xl w-fit shadow-sm">{['liquidar', 'empleados', 'history'].map(m => <button key={m} onClick={()=>setMode(m)} className={`px-8 py-3 rounded-2xl font-black text-[10px] uppercase transition-all ${mode===m?'bg-blue-600 text-white shadow-xl shadow-blue-100':'text-slate-400 hover:text-slate-800'}`}>{m}</button>)}</div>
       {mode === 'empleados' && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div className="bg-white p-10 rounded-[40px] shadow-sm border border-slate-100"><h3 className="font-black text-xl mb-8 tracking-tighter">Vinculación</h3><form onSubmit={async (e)=>{e.preventDefault(); await axios.post('/api/empleados', formEmp); load(); setFormEmp({nombre:'',email:'',salario:'',eps:'',arl:'',pension:''});}} className="space-y-4"><input className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold" placeholder="Nombre" value={formEmp.nombre} onChange={e=>setFormEmp({...formEmp, nombre: e.target.value})} required/><input className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold" type="email" placeholder="Email" value={formEmp.email} onChange={e=>setFormEmp({...formEmp, email: e.target.value})} required/><input className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold" type="number" placeholder="Salario" value={formEmp.salario} onChange={e=>setFormEmp({...formEmp, salario: e.target.value})} required/><div className="grid grid-cols-3 gap-2"><input className="p-3 bg-slate-50 border-none rounded-xl text-[10px] uppercase font-black" placeholder="EPS" value={formEmp.eps} onChange={e=>setFormEmp({...formEmp, eps: e.target.value})}/><input className="p-3 bg-slate-50 border-none rounded-xl text-[10px] uppercase font-black" placeholder="ARL" value={formEmp.arl} onChange={e=>setFormEmp({...formEmp, arl: e.target.value})}/><input className="p-3 bg-slate-50 border-none rounded-xl text-[10px] uppercase font-black" placeholder="F.P" value={formEmp.pension} onChange={e=>setFormEmp({...formEmp, pension: e.target.value})}/></div><button className="w-full bg-blue-600 text-white font-black py-4 rounded-2xl shadow-xl">VINCULAR</button></form></div>
-            <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4 h-fit pr-2">{empleados.map(e=>(<div key={e.id} className="bg-white p-6 rounded-[32px] shadow-sm border border-slate-100 flex items-center gap-6"><div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center font-black text-2xl text-blue-600">{e.nombre.charAt(0)}</div><div className="overflow-hidden"><p className="font-black text-slate-800 text-lg tracking-tighter truncate">{e.nombre}</p><p className="text-xl font-black text-green-600 mt-1">{fmt(e.salario)}</p></div></div>))}</div>
+            <div className="bg-white p-10 rounded-[40px] shadow-sm border border-slate-100"><h3 className="font-black text-xl mb-8 tracking-tighter">Vincular Personal</h3><form onSubmit={async (e)=>{e.preventDefault(); await axios.post('/api/empleados', formEmp); load(); setFormEmp({nombre:'',email:'',salario:'',eps:'',arl:'',pension:''});}} className="space-y-4"><input className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold" placeholder="Nombre completo" value={formEmp.nombre} onChange={e=>setFormEmp({...formEmp, nombre: e.target.value})} required/><input className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold" type="email" placeholder="Email" value={formEmp.email} onChange={e=>setFormEmp({...formEmp, email: e.target.value})} required/><input className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold" type="number" placeholder="Salario Mensual" value={formEmp.salario} onChange={e=>setFormEmp({...formEmp, salario: e.target.value})} required/><div className="grid grid-cols-3 gap-2"><input className="p-3 bg-slate-50 border-none rounded-xl text-[10px] font-black uppercase" placeholder="EPS" value={formEmp.eps} onChange={e=>setFormEmp({...formEmp, eps: e.target.value})}/><input className="p-3 bg-slate-50 border-none rounded-xl text-[10px] font-black uppercase" placeholder="ARL" value={formEmp.arl} onChange={e=>setFormEmp({...formEmp, arl: e.target.value})}/><input className="p-3 bg-slate-50 border-none rounded-xl text-[10px] font-black uppercase" placeholder="F.P" value={formEmp.pension} onChange={e=>setFormEmp({...formEmp, pension: e.target.value})}/></div><button className="w-full bg-blue-600 text-white font-black py-4 rounded-2xl shadow-xl shadow-blue-100">VINCULAR</button></form></div>
+            <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4 h-fit pr-2">{empleados.map(e=>(<div key={e.id} className="bg-white p-6 rounded-[32px] shadow-sm border border-slate-100 flex items-center gap-6 hover:scale-[1.02] transition-all cursor-pointer"><div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center font-black text-2xl text-blue-600">{e.nombre.charAt(0)}</div><div className="overflow-hidden"><p className="font-black text-slate-800 text-lg tracking-tighter truncate">{e.nombre}</p><p className="text-xl font-black text-green-600 mt-1">{fmt(e.salario)}</p></div></div>))}</div>
         </div>
       )}
       {mode === 'liquidar' && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-              <div className="bg-white p-12 rounded-[40px] shadow-xl border border-green-100"><h3 className="font-black text-xl mb-8 tracking-tighter flex items-center gap-3"><Calculator/> LIQUIDADOR</h3><div className="space-y-6"><div><label className="text-[10px] font-black uppercase text-slate-400 ml-4 block mb-2">Empleado</label><select className="w-full p-5 bg-slate-50 border-none rounded-3xl font-black" onChange={e=>setFormLiq({...formLiq, empleado_id: e.target.value})}><option>-- Seleccionar --</option>{empleados.map(e=><option key={e.id} value={e.id}>{e.nombre}</option>)}</select></div><div className="grid grid-cols-2 gap-6"><div><label className="text-[10px] font-black uppercase text-slate-400 ml-4">Días</label><input type="number" className="w-full p-5 bg-slate-50 border-none rounded-3xl font-black" value={formLiq.dias} onChange={e=>setFormLiq({...formLiq, dias: e.target.value})}/></div><div><label className="text-[10px] font-black uppercase text-slate-400 ml-4">Extras</label><input type="number" className="w-full p-5 bg-slate-50 border-none rounded-3xl font-black" value={formLiq.extras} onChange={e=>setFormLiq({...formLiq, extras: e.target.value})}/></div></div><div><label className="text-[10px] font-black uppercase text-slate-400 ml-4">Tipo Recargo</label><select className="w-full p-5 bg-slate-50 border-none rounded-3xl font-black" value={formLiq.tipo_extra} onChange={e=>setFormLiq({...formLiq, tipo_extra: e.target.value})}><option value="Diurna">Diurna</option><option value="Nocturna">Nocturna</option><option value="Dominical">Dominical</option><option value="Recargo_Nocturno">Recargo</option></select></div><button onClick={calcular} className="w-full bg-slate-900 text-white font-black py-5 rounded-3xl shadow-xl hover:bg-black transition-all">CALCULAR</button></div></div>
-              <div className="bg-white p-12 rounded-[40px] shadow-2xl border-l-[12px] border-blue-600 flex flex-col justify-between">{preview ? (<div className="space-y-6 animate-fade-in"><div className="text-center border-b pb-8"><h4 className="text-3xl font-black text-slate-800 tracking-tighter">{preview.nombre}</h4></div><div className="bg-blue-600 p-8 rounded-[32px] text-center text-5xl font-black text-white">{fmt(preview.neto)}</div><button onClick={async ()=>{if(window.confirm(`¿Confirmar pago?`)){await axios.post('/api/nomina/liquidar', {...formLiq, extras: formLiq.extras, responsable: user.nombre}); window.alert("Éxito"); load(); setMode('history'); setPreview(null);}}} className="w-full bg-slate-900 text-white font-black py-6 rounded-[32px] shadow-xl hover:scale-102 transition-all">PAGAR</button></div>) : <div className="h-full flex items-center justify-center opacity-20"><Mail size={100}/></div>}</div>
+              <div className="bg-white p-12 rounded-[40px] shadow-xl border border-green-100"><h3 className="font-black text-2xl mb-8 text-green-800 tracking-tighter flex items-center gap-3"><Calculator/> LIQUIDADOR</h3><div className="space-y-6"><div><label className="text-[10px] font-black uppercase text-slate-400 ml-4 block mb-2">Empleado</label><select className="w-full p-5 bg-slate-50 border-none rounded-3xl font-black" onChange={e=>setFormLiq({...formLiq, empleado_id: e.target.value})}><option>-- Seleccionar --</option>{empleados.map(e=><option key={e.id} value={e.id}>{e.nombre}</option>)}</select></div><div className="grid grid-cols-2 gap-6"><div><label className="text-[10px] font-black uppercase text-slate-400 ml-4">Días</label><input type="number" className="w-full p-5 bg-slate-50 border-none rounded-3xl font-black" value={formLiq.dias} onChange={e=>setFormLiq({...formLiq, dias: e.target.value})}/></div><div><label className="text-[10px] font-black uppercase text-slate-400 ml-4">Extras</label><input type="number" className="w-full p-5 bg-slate-50 border-none rounded-3xl font-black" value={formLiq.extras} onChange={e=>setFormLiq({...formLiq, extras: e.target.value})}/></div></div><div><label className="text-[10px] font-black uppercase text-slate-400 ml-4">Tipo Recargo</label><select className="w-full p-5 bg-slate-50 border-none rounded-3xl font-black" value={formLiq.tipo_extra} onChange={e=>setFormLiq({...formLiq, tipo_extra: e.target.value})}><option value="Diurna">Diurna</option><option value="Nocturna">Nocturna</option><option value="Dominical">Dominical</option><option value="Recargo_Nocturno">Recargo</option></select></div><button onClick={calcular} className="w-full bg-slate-900 text-white font-black py-5 rounded-3xl shadow-xl hover:bg-black transition-all">CALCULAR</button></div></div>
+              <div className="bg-white p-12 rounded-[40px] shadow-2xl border-l-[12px] border-blue-600 flex flex-col justify-between">{preview ? (<div className="space-y-6 animate-fade-in"><div className="text-center border-b pb-8"><h4 className="text-3xl font-black text-slate-800 tracking-tighter">{preview.nombre}</h4></div><div className="bg-blue-600 p-8 rounded-[32px] text-center text-5xl font-black text-white shadow-xl shadow-blue-100">{fmt(preview.neto)}</div><button onClick={async ()=>{if(window.confirm(`¿Confirmar pago a ${preview.nombre}?`)){await axios.post('/api/nomina/liquidar', {...formLiq, extras: formLiq.extras, responsable: user.nombre}); window.alert("Éxito"); load(); setMode('history'); setPreview(null);}}} className="w-full bg-slate-900 text-white font-black py-6 rounded-[32px] shadow-xl hover:scale-102 transition-all active:scale-95">CONFIRMAR PAGO</button></div>) : <div className="h-full flex items-center justify-center opacity-20"><Mail size={100}/></div>}</div>
           </div>
       )}
       {mode === 'history' && (
-          <div className="bg-white rounded-[40px] shadow-sm overflow-hidden border border-slate-100 pr-2"><table className="w-full text-left text-sm"><thead className="bg-slate-50/50 text-[10px] font-black uppercase text-slate-400 border-b"><tr><th className="p-8">Fecha</th><th>Empleado</th><th className="p-8 text-right">Neto</th></tr></thead><tbody>{nominas.map(n => (<tr key={n.id} className="border-b hover:bg-slate-50 transition"><td className="p-8 text-xs font-black text-slate-500">{new Date(n.fecha_pago).toLocaleDateString()}</td><td className="font-black text-slate-800 text-lg tracking-tight">{n.nombre_empleado}</td><td className="p-8 font-black text-green-600 text-xl text-right">{fmt(n.neto_pagar)}</td></tr>))}</tbody></table></div>
+          <div className="bg-white rounded-[40px] shadow-sm overflow-hidden border border-slate-100 pr-2"><table className="w-full text-left text-sm"><thead className="bg-slate-50/50 text-[10px] font-black uppercase text-slate-400 border-b"><tr className="tracking-widest"> <th className="p-8">Fecha Pago</th><th>Empleado</th><th className="p-8 text-right">Neto Pagado</th></tr></thead><tbody>{nominas.map(n => (<tr key={n.id} className="border-b hover:bg-slate-50 transition"><td className="p-8 text-xs font-black text-slate-500">{new Date(n.fecha_pago).toLocaleDateString()}</td><td className="font-black text-slate-800 text-lg tracking-tight">{n.nombre_empleado}</td><td className="p-8 font-black text-green-600 text-xl text-right">{fmt(n.neto_pagar)}</td></tr>))}</tbody></table></div>
       )}
     </div>
   );
@@ -405,16 +414,16 @@ function ContabilidadView() {
                 <div className="bg-white p-8 rounded-[40px] shadow-sm border-l-[12px] border-l-red-500"><p className="text-[10px] font-black uppercase tracking-[3px] text-slate-400 mb-2">Pasivos</p><h3 className="text-3xl font-black tracking-tighter">{fmt(totalPasivos)}</h3></div>
                 <div className="bg-white p-8 rounded-[40px] shadow-sm border-l-[12px] border-l-blue-600"><p className="text-[10px] font-black uppercase tracking-[3px] text-slate-400 mb-2">Utilidad</p><h3 className="text-3xl font-black tracking-tighter">{fmt(utilidadBruta)}</h3></div>
             </div>
-            <div className="flex gap-4 p-2 bg-white border rounded-3xl w-fit shadow-sm"><button onClick={()=>setSubTab('diario')} className={`px-8 py-3 rounded-2xl font-black text-xs uppercase ${subTab==='diario'?'bg-slate-900 text-white shadow-xl':'text-slate-400 hover:text-slate-800'}`}>Diario</button><button onClick={()=>setSubTab('balance')} className={`px-8 py-3 rounded-2xl font-black text-xs uppercase ${subTab==='balance'?'bg-slate-900 text-white shadow-xl':'text-slate-400 hover:text-slate-800'}`}>Balance</button></div>
+            <div className="flex gap-4 p-2 bg-white border rounded-3xl w-fit shadow-sm"><button onClick={()=>setSubTab('diario')} className={`px-8 py-3 rounded-2xl font-black text-xs uppercase transition-all ${subTab==='diario'?'bg-slate-900 text-white shadow-xl':'text-slate-400 hover:text-slate-900'}`}>Diario</button><button onClick={()=>setSubTab('balance')} className={`px-8 py-3 rounded-2xl font-black text-xs uppercase transition-all ${subTab==='balance'?'bg-slate-900 text-white shadow-xl':'text-slate-400 hover:text-slate-900'}`}>Balance</button></div>
             {subTab === 'diario' && (
                 <div className="space-y-6">
                     {Object.values(gruposDiario).map(comp => (
-                        <div key={comp.id} className="bg-white rounded-[40px] shadow-sm border overflow-hidden animate-slide-up"><div className="px-8 py-4 bg-slate-50 border-b flex justify-between items-center"><span className="font-black text-slate-800 tracking-tight">{comp.tipo} #{comp.id}</span><span className="text-xs font-black text-slate-400">{new Date(comp.fecha).toLocaleDateString()}</span></div><table className="w-full text-left text-sm"><tbody>{comp.asientos.map((as, idx) => (<tr key={idx} className="border-b last:border-none hover:bg-slate-50 transition"><td className="p-4 pl-12 font-bold text-slate-600 text-sm"><span className="text-blue-600 mr-2">{as.cuenta_codigo}</span> {as.cuenta_nombre}</td><td className="text-right font-black text-slate-800">{as.debito > 0 ? fmt(as.debito) : '-'}</td><td className="p-4 pr-12 text-right font-black text-slate-800">{as.credito > 0 ? fmt(as.credito) : '-'}</td></tr>))}</tbody></table></div>
+                        <div key={comp.id} className="bg-white rounded-[40px] shadow-sm border border-slate-50 overflow-hidden animate-slide-up"><div className="px-8 py-4 bg-slate-50 border-b flex justify-between items-center"><span className="font-black text-slate-800 tracking-tight">{comp.tipo} #{comp.id}</span><span className="text-xs font-black text-slate-400 uppercase tracking-widest">{new Date(comp.fecha).toLocaleDateString()}</span></div><table className="w-full text-left text-sm"><tbody>{comp.asientos.map((as, idx) => (<tr key={idx} className="border-b last:border-none hover:bg-slate-50 transition"><td className="p-4 pl-12 font-bold text-slate-600 text-xs"><span className="text-blue-600 mr-2">{as.cuenta_codigo}</span> {as.cuenta_nombre}</td><td className="text-right font-black text-slate-800">{as.debito > 0 ? fmt(as.debito) : '-'}</td><td className="p-4 pr-12 text-right font-black text-slate-800">{as.credito > 0 ? fmt(as.credito) : '-'}</td></tr>))}</tbody></table></div>
                     ))}
                 </div>
             )}
             {subTab === 'balance' && (
-                <div className="bg-white rounded-[40px] shadow-sm border overflow-hidden pr-2 animate-slide-up pr-2"><table className="w-full text-left"><thead className="bg-slate-900 text-white"><tr className="text-[10px] font-black uppercase tracking-widest"><th className="p-8">Código</th><th>Cuenta</th><th className="p-8 text-right">Saldo Final</th></tr></thead><tbody>{balance.map((cta, i) => (<tr key={i} className="border-b hover:bg-blue-50 transition group"><td className="p-6 font-black text-blue-600">{cta.codigo}</td><td className="font-bold text-slate-700">{cta.nombre}</td><td className={`p-8 text-right font-black ${cta.saldo < 0 ? 'text-red-500' : 'text-slate-900'}`}>{fmt(Math.abs(cta.saldo))} {cta.saldo < 0 ? '(Cr)' : '(Db)'}</td></tr>))}</tbody></table></div>
+                <div className="bg-white rounded-[40px] shadow-sm border border-slate-50 overflow-hidden pr-2 animate-slide-up pr-2"><table className="w-full text-left"><thead className="bg-slate-900 text-white"><tr className="text-[10px] font-black uppercase tracking-widest"><th className="p-8">Código</th><th>Cuenta Contable</th><th className="p-8 text-right">Saldo Final</th></tr></thead><tbody>{balance.map((cta, i) => (<tr key={i} className="border-b hover:bg-blue-50 transition group"><td className="p-6 font-black text-blue-600">{cta.codigo}</td><td className="font-bold text-slate-700">{cta.nombre}</td><td className={`p-8 text-right font-black ${cta.saldo < 0 ? 'text-red-500' : 'text-slate-900'}`}>{fmt(Math.abs(cta.saldo))} {cta.saldo < 0 ? '(Cr)' : '(Db)'}</td></tr>))}</tbody></table></div>
             )}
         </div>
     );
