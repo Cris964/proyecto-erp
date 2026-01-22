@@ -211,4 +211,21 @@ app.get('/api/nomina/historial', async(req, res) => {
     try { const [rows] = await pool.query("SELECT * FROM nominas ORDER BY fecha_pago DESC"); res.json(rows); } catch (e) { res.status(500).send(e.message); }
 });
 
+// EDITAR USUARIO
+app.put('/api/admin/usuarios/:id', async (req, res) => {
+    try {
+        const { nombre, email, cargo } = req.body;
+        await pool.query("UPDATE usuarios SET nombre=?, email=?, cargo=? WHERE id=?", [nombre, email, cargo, req.params.id]);
+        res.json({ success: true });
+    } catch (e) { res.status(500).send(e.message); }
+});
+
+// ELIMINAR USUARIO
+app.delete('/api/admin/usuarios/:id', async (req, res) => {
+    try {
+        await pool.query("DELETE FROM usuarios WHERE id=?", [req.params.id]);
+        res.json({ success: true });
+    } catch (e) { res.status(500).send(e.message); }
+});
+
 module.exports = app;

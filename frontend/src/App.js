@@ -394,17 +394,22 @@ function NominaView({ user }) {
   const [nominas, setNominas] = useState([]);
   const [selectedEmp, setSelectedEmp] = useState(null); 
   const [empHistory, setEmpHistory] = useState([]);
+  
   const [formEmp, setFormEmp] = useState({ nombre: '', email: '', salario: '', eps: '', arl: '', pension: '' });
   const [formLiq, setFormLiq] = useState({ empleado_id: '', dias: 30, extras: 0, tipo_extra: 'Diurna', metodo: 'Transferencia', banco: '', cuenta: '' });
   const [preview, setPreview] = useState(null);
+  const bancosCO = ["Bancolombia", "Nequi", "Daviplata", "Davienda", "Banco de Bogotá", "Lulo Bank", "Nu Bank", "Dale"];
 
-  const load = useCallback(() => { axios.get('/empleados').then(res => setEmpleados(res.data)); axios.get('/nomina/historial').then(res => setNominas(res.data)); }, []);
+  const load = useCallback(() => { 
+    axios.get('/api/empleados').then(res => setEmpleados(res.data)); 
+    axios.get('/api/nomina/historial').then(res => setNominas(res.data)); 
+  }, []);
   useEffect(() => { load(); }, [load]);
 
   const verPerfil = async (emp) => {
       setSelectedEmp(emp);
       try {
-          const res = await axios.get(`/empleados/${emp.id}/historial`);
+          const res = await axios.get(`/api/empleados/${emp.id}/historial`);
           setEmpHistory(res.data);
           setMode('perfil');
       } catch (e) { window.alert("Error al cargar historial"); }
@@ -422,13 +427,77 @@ function NominaView({ user }) {
 
   return (
     <div className="space-y-10 animate-fade-in">
-      <div className="flex gap-4 p-2 bg-white border rounded-3xl w-fit shadow-sm">{['liquidar', 'empleados', 'history'].map(m => <button key={m} onClick={()=>{setMode(m); setSelectedEmp(null);}} className={`px-8 py-3 rounded-2xl font-black text-[10px] uppercase transition-all ${mode===m || (mode==='perfil' && m==='empleados') ?'bg-blue-600 text-white shadow-xl shadow-blue-100':'text-slate-400 hover:text-slate-800'}`}>{m}</button>)}</div>
+      <div className="flex gap-4 p-2 bg-white border rounded-3xl w-fit shadow-sm">
+        {['liquidar', 'empleados', 'history'].map(m => (
+            <button key={m} onClick={()=>{setMode(m); setSelectedEmp(null); setPreview(null);}} className={`px-8 py-3 rounded-2xl font-black text-[10px] uppercase transition-all ${mode===m || (mode==='perfil' && m==='empleados') ?'bg-blue-600 text-white shadow-xl':'text-slate-400 hover:text-slate-800'}`}>{m}</button>
+        ))}
+      </div>
+
+      {mode === 'liquidar' && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
+              <div className="bg-white p-12 rounded-[40px] shadow-xl border border-green-100">
+                  <h3 className="font-black text-2xl mb-8 text-green-800 flex items-center gap-3"><Calculator/> LIQUIDADOR 2026</h3>
+                  <div className="space-y-6">
+                      <div><label className="text-[10px] font-black uppercase text-slate-400 ml-4 mb-2 block">Empleado</label>
+                        <select className="w-full p-5 bg-slate-50 border-none rounded-3xl font-black" onChange={e=>setFormLiq({...formLiq, empleado_id: e.target.value})}><option>-- Seleccionar --</option>{empleados.map(e=><option key={e.id} value={e.id}>{e.nombre}</option>)}</select>
+                      </div>
+                      <div className="grid grid-cols-2 gap-6">
+                          <div><label className="text-[10px] font-black uppercase text-slate-400 ml-4">Días Laborados</label><input type="number" className="w-full p-5 bg-slate-50 border-none rounded-3xl font-black" value={formLiq.dias} onChange={e=>setFormLiq({...formLiq, dias: e.target.value})}/></div>
+                          <div><label className="text-[10px] font-black uppercase text-slate-400 ml-4">Cant. Horas Extras</label><input type="number" className="w-full p-5 bg-slate-50 border-none rounded-3xl font-black" value={formLiq.extras} onChange={e=>setFormLiq({...formLiq, extras: e.target.value})}/></div>
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-black uppercase text-slate-400 ml-4">Tipo Recargo</label>
+                        <select className="w-full p-5 bg-slate-50 border-none rounded-3xl font-black" value={formLiq.tipo_extra} onChange={e=>setFormLiq({...formLiq, tipo_extra: e.target.value})}>
+                            <option value="Diurna">Diurna (1.25)</option><option value="Nocturna">Nocturna (1.75)</option><option value="Dominical">Dominical (2.00)</option><option value="Recargo_Nocturno">Recargo (0.35)</option>
+                        </select>
+                      </div>
+                      <div className="flex gap-4">
+                        <button onClick={()=>setFormLiq({...formLiq, metodo: 'Efectivo'})} className={`flex-1 p-5 rounded-3xl font-black border-2 ${formLiq.metodo==='Efectivo'?'bg-green-50 border-green-500 text-green-700':'bg-white border-slate-50'}`}>EFECTIVO</button>
+                        <button onClick={()=>setFormLiq({...formLiq, metodo: 'Transferencia'})} className={`flex-1 p-5 rounded-3xl font-black border-2 ${formLiq.metodo==='Transferencia'?'bg-blue-50 border-blue-500 text-blue-700':'bg-white border-slate-50'}`}>BANCO</button>
+                      </div>
+                      {formLiq.metodo === 'Transferencia' && (
+                          <div className="grid grid-cols-2 gap-4 animate-fade-in">
+                              <select className="p-5 bg-slate-50 border-none rounded-3xl font-bold" onChange={e=>setFormLiq({...formLiq, banco: e.target.value})}><option>-- Banco --</option>{bancosCO.map(b=><option key={b}>{b}</option>)}</select>
+                              <input className="p-5 bg-slate-50 border-none rounded-3xl font-bold" placeholder="Nro Cuenta" onChange={e=>setFormLiq({...formLiq, cuenta: e.target.value})} />
+                          </div>
+                      )}
+                      <button onClick={calcular} className="w-full bg-slate-900 text-white font-black py-5 rounded-3xl shadow-xl hover:bg-black transition-all">CALCULAR RESUMEN</button>
+                  </div>
+              </div>
+              
+              <div className="bg-white p-12 rounded-[40px] shadow-2xl border-l-[12px] border-blue-600 flex flex-col justify-between">
+                  {preview ? (
+                      <div className="space-y-6 animate-fade-in">
+                          <div className="text-center border-b pb-8"><h4 className="text-3xl font-black text-slate-800 tracking-tighter">{preview.nombre}</h4><p className="text-[10px] font-black text-slate-400 uppercase tracking-[4px] mt-2">Nómina 2026</p></div>
+                          <div className="space-y-3 font-bold text-sm text-slate-600">
+                              <div className="flex justify-between"><span>Sueldo Básico:</span><span className="text-slate-800">{fmt(preview.basico)}</span></div>
+                              <div className="flex justify-between"><span>Auxilio Transporte:</span><span className="text-slate-800">{fmt(preview.auxilio)}</span></div>
+                              <div className="flex justify-between"><span>Extras:</span><span className="text-slate-800">{fmt(preview.extras)}</span></div>
+                              <div className="flex justify-between text-red-500 border-t pt-4"><span>Deducciones Ley:</span><span>-{fmt(Math.round((preview.basico+preview.extras)*0.08))}</span></div>
+                          </div>
+                          <div className="bg-blue-600 p-8 rounded-[32px] text-center shadow-2xl shadow-blue-100">
+                              <span className="text-blue-200 text-[10px] font-black uppercase block mb-1">Total Neto a Pagar</span>
+                              <span className="text-5xl font-black text-white tracking-tighter">{fmt(preview.neto)}</span>
+                          </div>
+                          <button onClick={async ()=>{
+                              if(window.confirm(`¿Confirmar pago a ${preview.nombre}?`)){
+                                  await axios.post('/api/nomina/liquidar', {...formLiq, extras: formLiq.extras, responsable: user.nombre}); 
+                                  window.alert("Pagado y enviado"); load(); setMode('history'); setPreview(null);
+                              }
+                          }} className="w-full bg-slate-900 text-white font-black py-6 rounded-[32px] shadow-xl hover:scale-[1.02] transition-all">CONFIRMAR Y ENVIAR EMAIL</button>
+                      </div>
+                  ) : <div className="h-full flex items-center justify-center opacity-20 flex-col"><Mail size={100}/><p className="font-black mt-4">LISTO PARA LIQUIDAR</p></div>}
+              </div>
+          </div>
+      )}
+
       {mode === 'empleados' && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div className="bg-white p-10 rounded-[40px] shadow-sm border border-slate-100 h-fit"><h3 className="font-black text-xl mb-8 tracking-tighter text-slate-800 uppercase italic">Contratar Personal</h3><form onSubmit={async (e)=>{e.preventDefault(); await axios.post('/empleados', formEmp); load(); setFormEmp({nombre:'',email:'',salario:'',eps:'',arl:'',pension:''});}} className="space-y-4"><input className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold" placeholder="Nombre completo" value={formEmp.nombre} onChange={e=>setFormEmp({...formEmp, nombre: e.target.value})} required/><input className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold" type="email" placeholder="Email" value={formEmp.email} onChange={e=>setFormEmp({...formEmp, email: e.target.value})} required/><input className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold" type="number" placeholder="Salario Mensual" value={formEmp.salario} onChange={e=>setFormEmp({...formEmp, salario: e.target.value})} required/><div className="grid grid-cols-3 gap-2"><input className="p-3 bg-slate-50 border-none rounded-xl text-[10px] font-black uppercase" placeholder="EPS" value={formEmp.eps} onChange={e=>setFormEmp({...formEmp, eps: e.target.value})}/><input className="p-3 bg-slate-50 border-none rounded-xl text-[10px] font-black uppercase" placeholder="ARL" value={formEmp.arl} onChange={e=>setFormEmp({...formEmp, arl: e.target.value})}/><input className="p-3 bg-slate-50 border-none rounded-xl text-[10px] font-black uppercase" placeholder="F.P" value={formEmp.pension} onChange={e=>setFormEmp({...formEmp, pension: e.target.value})}/></div><button className="w-full bg-blue-600 text-white font-black py-4 rounded-2xl shadow-xl shadow-blue-100">VINCULAR</button></form></div>
-            <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4 h-fit pr-2">{empleados.map(e=>(<div key={e.id} onClick={()=>verPerfil(e)} className="bg-white p-6 rounded-[32px] shadow-sm border border-slate-100 flex items-center gap-6 hover:scale-[1.02] transition-all cursor-pointer"><div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center font-black text-2xl text-blue-600">{e.nombre.charAt(0)}</div><div className="overflow-hidden"><p className="font-black text-slate-800 text-lg tracking-tighter truncate">{e.nombre}</p><p className="text-xl font-black text-green-600 mt-1 tracking-tighter">{fmt(e.salario)}</p></div></div>))}</div>
+            <div className="bg-white p-10 rounded-[40px] shadow-sm border border-slate-100 h-fit"><h3 className="font-black text-xl mb-8 tracking-tighter text-slate-800 uppercase italic">Vincular Personal</h3><form onSubmit={async (e)=>{e.preventDefault(); await axios.post('/api/empleados', formEmp); load(); setFormEmp({nombre:'',email:'',salario:'',eps:'',arl:'',pension:''});}} className="space-y-4"><input className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold" placeholder="Nombre completo" value={formEmp.nombre} onChange={e=>setFormEmp({...formEmp, nombre: e.target.value})} required/><input className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold" type="email" placeholder="Email" value={formEmp.email} onChange={e=>setFormEmp({...formEmp, email: e.target.value})} required/><input className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold" type="number" placeholder="Salario Mensual" value={formEmp.salario} onChange={e=>setFormEmp({...formEmp, salario: e.target.value})} required/><div className="grid grid-cols-3 gap-2"><input className="p-3 bg-slate-50 border-none rounded-xl text-[10px] font-black uppercase" placeholder="EPS" value={formEmp.eps} onChange={e=>setFormEmp({...formEmp, eps: e.target.value})} required/><input className="p-3 bg-slate-50 border-none rounded-xl text-[10px] font-black uppercase" placeholder="ARL" value={formEmp.arl} onChange={e=>setFormEmp({...formEmp, arl: e.target.value})} required/><input className="p-3 bg-slate-50 border-none rounded-xl text-[10px] font-black uppercase" placeholder="F.P" value={formEmp.pension} onChange={e=>setFormEmp({...formEmp, pension: e.target.value})} required/></div><button className="w-full bg-blue-600 text-white font-black py-4 rounded-2xl shadow-xl shadow-blue-100">VINCULAR</button></form></div>
+            <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4 h-fit pr-2">{empleados.map(e=>(<div key={e.id} onClick={()=>verPerfil(e)} className="bg-white p-6 rounded-[32px] shadow-sm border border-slate-100 flex items-center gap-6 hover:scale-[1.02] transition-all cursor-pointer group"><div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center font-black text-2xl text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-all">{e.nombre.charAt(0)}</div><div className="overflow-hidden"><p className="font-black text-slate-800 text-lg tracking-tighter truncate">{e.nombre}</p><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{e.email}</p><p className="text-xl font-black text-green-600 mt-1">{fmt(e.salario)}</p></div></div>))}</div>
         </div>
       )}
+
       {mode === 'perfil' && selectedEmp && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-slide-up">
               <div className="bg-slate-900 p-10 rounded-[40px] text-white shadow-2xl h-fit">
@@ -440,31 +509,76 @@ function NominaView({ user }) {
                       <div className="flex justify-between text-xs"><span className="text-slate-500 uppercase font-black tracking-widest">ARL</span><span className="font-bold text-orange-400">{selectedEmp.arl || 'N/A'}</span></div>
                       <div className="flex justify-between text-xs"><span className="text-slate-500 uppercase font-black tracking-widest">Fondo Pensión</span><span className="font-bold text-purple-400">{selectedEmp.pension_fund || 'N/A'}</span></div>
                   </div>
+                  <button onClick={()=>setMode('empleados')} className="w-full mt-10 py-3 bg-white/10 hover:bg-white/20 rounded-2xl font-bold text-xs transition-all text-slate-300">VOLVER A LA LISTA</button>
               </div>
               <div className="lg:col-span-2 space-y-6">
                   <h3 className="font-black text-2xl tracking-tighter text-slate-800 uppercase italic">Pagos Históricos</h3>
-                  <div className="bg-white rounded-[40px] shadow-sm border border-slate-100 overflow-hidden"><table className="w-full text-left"><thead className="bg-slate-50/50 text-[10px] font-black uppercase"><tr className="border-b"><th className="p-6">Fecha</th><th>Periodo</th><th className="text-right p-6">Neto Pagado</th></tr></thead><tbody>{empHistory.map(h => (<tr key={h.id} className="border-b hover:bg-slate-50 transition-all"><td className="p-6 text-sm font-bold text-slate-500">{new Date(h.fecha_pago).toLocaleDateString()}</td><td className="text-sm font-black text-slate-700">{h.periodo || 'Mensual'}</td><td className="p-6 text-right font-black text-blue-600">{fmt(h.neto_pagar)}</td></tr>))}{empHistory.length === 0 && <tr><td colSpan="3" className="p-10 text-center text-slate-300 italic font-bold">Sin historial de pagos en la nube aún.</td></tr>}</tbody></table></div>
+                  <div className="bg-white rounded-[40px] shadow-sm border border-slate-100 overflow-hidden"><table className="w-full text-left"><thead className="bg-slate-50/50 text-[10px] font-black uppercase"><tr className="border-b"><th className="p-6">Fecha</th><th>Responsable</th><th className="text-right p-6">Neto Pagado</th></tr></thead><tbody>{empHistory.map(h => (<tr key={h.id} className="border-b hover:bg-slate-50 transition-all"><td className="p-6 text-sm font-bold text-slate-500">{new Date(h.fecha_pago).toLocaleDateString()}</td><td className="text-sm font-black text-slate-700 uppercase">{h.responsable}</td><td className="p-6 text-right font-black text-blue-600">{fmt(h.neto_pagar)}</td></tr>))}{empHistory.length === 0 && <tr><td colSpan="3" className="p-10 text-center text-slate-300 italic font-bold">Sin historial de pagos registrado.</td></tr>}</tbody></table></div>
               </div>
           </div>
       )}
-      {/* Liquidar y History se mantienen igual */}
+
+      {mode === 'history' && (
+          <div className="bg-white rounded-[40px] shadow-sm overflow-hidden border border-slate-100 pr-2"><table className="w-full text-left text-sm"><thead className="bg-slate-50/50 text-[10px] font-black uppercase text-slate-400 border-b"><tr className="tracking-widest"> <th className="p-8">Fecha Pago</th><th>Empleado</th><th className="p-8 text-right">Neto Pagado</th></tr></thead><tbody>{nominas.map(n => (<tr key={n.id} className="border-b hover:bg-slate-50 transition"><td className="p-8 text-xs font-black text-slate-500">{new Date(n.fecha_pago).toLocaleDateString()}</td><td className="font-black text-slate-800 text-lg tracking-tight">{n.nombre_empleado}</td><td className="p-8 font-black text-green-600 text-xl text-right">{fmt(n.neto_pagar)}</td></tr>))}</tbody></table></div>
+      )}
     </div>
   );
 }
 
 function AdminView() {
     const [usuarios, setUsuarios] = useState([]);
-    useEffect(() => { axios.get('/admin/usuarios').then(res => setUsuarios(res.data)); }, []);
+    const [form, setForm] = useState({ nombre: '', email: '', password: '', cargo: 'Vendedor' });
+    const [editing, setEditing] = useState(null);
+
+    const load = () => axios.get('/api/admin/usuarios').then(res => setUsuarios(res.data));
+    useEffect(() => { load(); }, []);
+
+    const handleAdd = async (e) => {
+        e.preventDefault();
+        await axios.post('/api/register', form);
+        setForm({ nombre: '', email: '', password: '', cargo: 'Vendedor' });
+        load(); window.alert("Usuario creado");
+    };
+
+    const handleDelete = async (id) => {
+        if(window.confirm("¿Eliminar acceso?")) { await axios.delete(`/api/admin/usuarios/${id}`); load(); }
+    };
+
     return (
-        <div className="bg-white p-10 rounded-[40px] shadow-sm border border-slate-100">
-            <h3 className="text-2xl font-black mb-6 tracking-tighter uppercase italic">Control de Accesos</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {usuarios.map(u => (
-                    <div key={u.id} className="p-6 border rounded-3xl flex justify-between items-center bg-slate-50 group hover:border-blue-500 transition-all cursor-default">
-                        <div><p className="font-black text-slate-800">{u.nombre}</p><p className="text-xs text-slate-400 font-bold uppercase tracking-wider">{u.email}</p></div>
-                        <span className="bg-slate-900 text-white px-4 py-1.5 rounded-xl text-[9px] font-black tracking-widest">{u.cargo.toUpperCase()}</span>
-                    </div>
-                ))}
+        <div className="space-y-10 animate-fade-in">
+            <div className="bg-white p-10 rounded-[40px] shadow-sm border border-slate-100">
+                <h3 className="font-black text-xl mb-6 tracking-tighter">CREAR NUEVO ACCESO</h3>
+                <form onSubmit={handleAdd} className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                    <input className="p-4 bg-slate-50 border-none rounded-2xl font-bold" placeholder="Nombre" value={form.nombre} onChange={e=>setForm({...form, nombre: e.target.value})} required/>
+                    <input className="p-4 bg-slate-50 border-none rounded-2xl font-bold" placeholder="Email" value={form.email} onChange={e=>setForm({...form, email: e.target.value})} required/>
+                    <input className="p-4 bg-slate-50 border-none rounded-2xl font-bold" type="password" placeholder="Pass" value={form.password} onChange={e=>setForm({...form, password: e.target.value})} required/>
+                    <select className="p-4 bg-slate-50 border-none rounded-2xl font-black" value={form.cargo} onChange={e=>setForm({...form, cargo: e.target.value})}>
+                        <option value="Admin">Administrador</option>
+                        <option value="Vendedor">Vendedor</option>
+                        <option value="Contador">Contador</option>
+                    </select>
+                    <button className="bg-blue-600 text-white font-black rounded-2xl shadow-xl hover:bg-blue-700">AGREGAR</button>
+                </form>
+            </div>
+
+            <div className="bg-white rounded-[40px] shadow-sm overflow-hidden border border-slate-100">
+                <table className="w-full text-left">
+                    <thead className="bg-slate-50/50 text-[10px] font-black uppercase tracking-widest border-b">
+                        <tr><th className="p-8">Nombre</th><th>Email</th><th>Rol / Función</th><th className="p-8 text-center">Acciones</th></tr>
+                    </thead>
+                    <tbody>
+                        {usuarios.map(u => (
+                            <tr key={u.id} className="border-b hover:bg-slate-50 transition">
+                                <td className="p-8 font-black text-slate-800">{u.nombre}</td>
+                                <td className="text-slate-500 font-bold">{u.email}</td>
+                                <td><span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase ${u.cargo === 'Admin' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>{u.cargo}</span></td>
+                                <td className="p-8 text-center flex justify-center gap-2">
+                                    <button onClick={()=>handleDelete(u.id)} className="p-3 bg-red-50 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-all"><X size={16}/></button>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
             </div>
         </div>
     );
