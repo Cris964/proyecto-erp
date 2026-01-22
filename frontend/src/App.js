@@ -104,7 +104,7 @@ function LoginScreen({ onLogin, onGoToRegister }) {
         <form onSubmit={handle} className="space-y-4">
           <input className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold" value={email} onChange={e => setEmail(e.target.value)} placeholder="Email" />
           <input type="password" className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold" value={password} onChange={e => setPassword(e.target.value)} placeholder="Contraseña" />
-          <button className="w-full bg-slate-900 text-white font-black py-4 rounded-2xl shadow-xl">INGRESAR</button>
+          <button className="w-full bg-slate-900 text-white font-black py-4 rounded-2xl shadow-xl hover:bg-black transition-all">INGRESAR</button>
         </form>
         <button onClick={onGoToRegister} className="w-full mt-8 text-blue-600 font-black text-sm hover:underline">REGISTRAR EMPRESA</button>
       </div>
@@ -322,19 +322,19 @@ function InventarioView({ user }) {
       const data = XLSX.utils.sheet_to_json(wb.Sheets[wsname]);
       const prods = data.map(item => ({ nombre: item.Nombre || item.nombre, sku: item.SKU || item.sku, precio: item.Precio || item.precio, stock: item.Stock || item.stock, min_stock: item.Minimo || 5 }));
       if (window.confirm(`¿Importar ${prods.length} productos?`)) {
-        try { await axios.post('/productos/importar', { productos: prods, responsable: user.nombre }); window.alert("Éxito"); load(); } catch (e) { window.alert("Error"); }
+        try { await axios.post('/api/productos/importar', { productos: prods, responsable: user.nombre }); window.alert("Éxito"); load(); } catch (e) { window.alert("Error"); }
       }
     };
     reader.readAsBinaryString(file);
   };
   return (
     <div className="space-y-10 animate-fade-in">
-        <div className="bg-white p-10 rounded-[40px] shadow-sm border border-slate-100">
+        <div className="bg-white p-10 rounded-[40px] shadow-sm border border-slate-100 h-fit">
             <div className="flex justify-between items-center mb-8">
-                <h3 className="font-black text-xl tracking-tighter text-slate-800">Gestión de Stock</h3>
+                <h3 className="font-black text-xl tracking-tighter text-slate-800">Gestión de Personal</h3>
                 <label className="bg-slate-900 text-white px-6 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest cursor-pointer hover:bg-black flex items-center gap-2 shadow-xl shadow-slate-100"><Upload size={14} className="text-blue-500"/> Carga Masiva<input type="file" accept=".xlsx, .xls, .csv" onChange={handleImportExcel} className="hidden" /></label>
             </div>
-            <form onSubmit={async (e)=>{e.preventDefault(); await axios.post('/productos', {...form, responsable: user.nombre}); load(); setForm({nombre:'',sku:'',precio:'',stock:'',min_stock:5});}} className="grid grid-cols-1 md:grid-cols-5 gap-4">
+            <form onSubmit={async (e)=>{e.preventDefault(); await axios.post('/api/productos', {...form, responsable: user.nombre}); load(); setForm({nombre:'',sku:'',precio:'',stock:'',min_stock:5});}} className="grid grid-cols-1 md:grid-cols-5 gap-4">
                 <input className="p-4 bg-slate-50 border-none rounded-2xl font-bold" placeholder="Nombre" value={form.nombre} onChange={e=>setForm({...form, nombre: e.target.value})} required/>
                 <input className="p-4 bg-slate-50 border-none rounded-2xl font-bold" placeholder="Código" value={form.sku} onChange={e=>setForm({...form, sku: e.target.value})} required/>
                 <input className="p-4 bg-slate-50 border-none rounded-2xl font-bold" type="number" placeholder="Precio" value={form.precio} onChange={e=>setForm({...form, precio: e.target.value})} required/>
@@ -342,12 +342,12 @@ function InventarioView({ user }) {
                 <button className="bg-blue-600 text-white font-black rounded-2xl shadow-xl shadow-blue-100 hover:brightness-110 transition-all">CREAR</button>
             </form>
         </div>
-        <div className="bg-white rounded-[40px] shadow-sm overflow-hidden border border-slate-100 pr-2">
+        <div className="bg-white rounded-[40px] shadow-sm overflow-hidden border border-slate-100">
             <table className="w-full text-left">
                 <thead className="bg-slate-50/50 text-[10px] font-black uppercase tracking-widest border-b"><tr><th className="p-8">Producto</th><th>SKU</th><th>Precio</th><th>Stock</th><th className="p-8 text-center">Estado</th></tr></thead>
                 <tbody>{productos.map(p=>(<tr key={p.id} className="border-b hover:bg-slate-50 transition">
                     <td className="p-8 font-black text-slate-800">{p.nombre}</td><td className="font-mono text-slate-400 font-bold">{p.sku}</td><td className="font-black text-slate-700">{fmt(p.precio)}</td><td className="font-black text-slate-800">{p.stock}</td>
-                    <td className="p-8 text-center">{p.stock <= p.min_stock ? <span className="bg-red-100 text-red-600 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-[1px]">Crítico</span> : <span className="bg-green-100 text-green-700 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-[1px]">Disponible</span>}</td>
+                    <td className="p-8 text-center">{p.stock <= p.min_stock ? <span className="bg-red-50 text-red-600 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-[1px]">Crítico</span> : <span className="bg-green-50 text-green-700 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-[1px]">Disponible</span>}</td>
                 </tr>))}</tbody>
             </table>
         </div>
@@ -370,8 +370,8 @@ function NominaView({ user }) {
     const basico = Math.round((S / 30) * dias); const auxilio = (S <= 3501810) ? Math.round((249095 / 30) * dias) : 0;
     let factor = 1.25; if (formLiq.tipo_extra === 'Nocturna') factor = 1.75; if (formLiq.tipo_extra === 'Dominical') factor = 2.00; if (formLiq.tipo_extra === 'Recargo_Nocturno') factor = 0.35;
     const extras = Math.round((S / 240 * factor) * parseFloat(formLiq.extras || 0));
-    const dev = basico + auxilio + extras; const ibc = basico + extras; const sal = Math.round(ibc * 0.04); const pen = Math.round(ibc * 0.04);
-    setPreview({ nombre: e.nombre, basico, auxilio, extras, sal, pen, neto: dev - sal - pen });
+    const neto = (basico + auxilio + extras) - (Math.round((basico+extras)*0.08));
+    setPreview({ nombre: e.nombre, neto, basico, auxilio, extras });
   };
   return (
     <div className="space-y-10 animate-fade-in">
