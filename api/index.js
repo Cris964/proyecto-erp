@@ -164,12 +164,20 @@ app.get('/turnos/activo/:id', async(r,s)=>{
     try { const[d]=await pool.query("SELECT * FROM turnos WHERE usuario_id=? AND estado='Abierto'",[r.params.id]); s.json(d[0]||null); } catch (e) { s.status(500).send(e.message); }
 });
 
-app.post('/turnos/iniciar', async(r,s)=>{
-    try { const{usuario_id,nombre_usuario,base_caja}=r.body; await pool.query("INSERT INTO turnos (usuario_id,nombre_usuario,base_caja) VALUES (?,?,?)",[usuario_id,nombre_usuario,base_caja]); res.json({success:true}); } catch (e) { s.status(500).send(e.message); }
+app.post('/turnos/iniciar', async(req, res) => { // Cambiado r,s por req,res para consistencia
+    try {
+        const {usuario_id, nombre_usuario, base_caja} = req.body;
+        await pool.query("INSERT INTO turnos (usuario_id, nombre_usuario, base_caja) VALUES (?, ?, ?)", [usuario_id, nombre_usuario, base_caja]);
+        res.json({success: true});
+    } catch (e) { res.status(500).send(e.message); }
 });
 
-app.put('/turnos/finalizar', async(r,s)=>{
-    try { const[v]=await pool.query("SELECT IFNULL(SUM(total),0) as total FROM ventas WHERE turno_id=?",[r.body.turno_id]); await pool.query("UPDATE turnos SET fecha_fin=NOW(),estado='Cerrado',total_vendido=? WHERE id=?",[v[0].total,r.body.turno_id]); s.json({success:true}); } catch (e) { s.status(500).send(e.message); }
+app.put('/turnos/finalizar', async(req, res) => {
+    try {
+        const [v] = await pool.query("SELECT IFNULL(SUM(total), 0) as total FROM ventas WHERE turno_id = ?", [req.body.turno_id]);
+        await pool.query("UPDATE turnos SET fecha_fin = NOW(), estado = 'Cerrado', total_vendido = ? WHERE id = ?", [v[0].total, req.body.turno_id]);
+        res.json({success: true});
+    } catch (e) { res.status(500).send(e.message); }
 });
 
 app.get('/turnos/historial', async(r,s)=>{
