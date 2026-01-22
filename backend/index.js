@@ -9,19 +9,12 @@ app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 
 // --- SERVIR FRONTEND ---
-
-app.use(express.static(path.join(__dirname, '../frontend/build')));
-// Esta línea es la que permite ver el ERP en el navegador
 app.use(express.static(path.join(__dirname, '../frontend/build')));
 
-// Y esta es para que si refrescas la página no salga error 404
-app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, '../frontend/build', 'index.html'));
-});
 const dbConfig = {
     host: process.env.DB_HOST || 'mysql-14f55f3e-cristiancaicedo68-cf3e.h.aivencloud.com',
     user: process.env.DB_USER || 'avnadmin',
-    password: process.env.DB_PASSWORD || 'TU_CONTRASEÑA_DE_AIVEN', // La del icono del ojo
+    password: process.env.DB_PASSWORD || 'hzdq dzzk fooa ocdk', // La del icono del ojo
     database: process.env.DB_NAME || 'defaultdb',
     port: process.env.DB_PORT || 14489,
     ssl: { rejectUnauthorized: false } // <--- ESTO ES VITAL PARA AIVEN
@@ -42,32 +35,18 @@ const transporter = nodemailer.createTransport({
 // ================= RUTAS DE LA API =================
 
 // Registro de nuevos usuarios (EMPRESAS)
-// Registro de nuevos usuarios (EMPRESAS)
 app.post('/register', async (req, res) => {
     try {
         const { nombre, email, password } = req.body;
-        
-        // Verificación básica de datos
         if (!nombre || !email || !password) {
             return res.status(400).json({ success: false, message: "Todos los campos son obligatorios" });
         }
-
-        // Insertar usuario
         const sql = "INSERT INTO usuarios (nombre, email, password, cargo) VALUES (?, ?, ?, ?)";
         await pool.query(sql, [nombre, email, password, 'Admin']);
-        
-        console.log(`✅ Usuario registrado: ${email}`);
         res.json({ success: true, message: "Usuario registrado con éxito" });
-
     } catch (err) {
-        console.error("❌ Error en registro:", err.message);
-        
-        // Si el error es por correo duplicado
-        if (err.code === 'ER_DUP_ENTRY') {
-            return res.status(400).json({ success: false, message: "Este correo ya está registrado" });
-        }
-        
-        res.status(500).json({ success: false, message: "Error interno del servidor" });
+        if (err.code === 'ER_DUP_ENTRY') return res.status(400).json({ success: false, message: "Correo ya registrado" });
+        res.status(500).json({ success: false, message: err.message });
     }
 });
 
@@ -98,7 +77,7 @@ app.get('/dashboard-data', async (req, res) => {
     } catch (e) { res.status(500).send(e.message); }
 });
 
-// Empleados (Con campos de seguridad social)
+// Empleados
 app.get('/empleados', async (req, res) => {
     const [rows] = await pool.query("SELECT * FROM empleados");
     res.json(rows);
@@ -107,7 +86,6 @@ app.get('/empleados', async (req, res) => {
 app.post('/empleados', async (req, res) => {
     try {
         const { nombre, documento, cargo, salario, email, eps, arl, pension } = req.body;
-        // Si no tienes estas columnas en tu tabla, deberás añadirlas con ALTER TABLE
         await pool.query(
             "INSERT INTO empleados (nombre, documento, cargo, salario, email, eps, arl, pension_fund) VALUES (?,?,?,?,?,?,?,?)",
             [nombre, documento, cargo, salario, email, eps || 'N/A', arl || 'N/A', pension || 'N/A']
@@ -131,35 +109,29 @@ app.post('/nomina/liquidar', async (req, res) => {
         const AUX_TRANS_2026 = 249095; 
         const SALARIO_EMPLEADO = parseFloat(emp.salario);
 
-        // 1. Cálculo de Devengados
         const sueldoBasico = Math.round((SALARIO_EMPLEADO / 30) * dias);
         const auxilio = (SALARIO_EMPLEADO <= (SMLV_2026 * 2)) ? Math.round((AUX_TRANS_2026 / 30) * dias) : 0;
         
-        // --- LÓGICA DE HORAS EXTRAS 2026 ---
         const valorHora = SALARIO_EMPLEADO / 240;
-        let factor = 1.25; // Normal (Diurna)
+        let factor = 1.25; 
         if (tipo_extra === 'Nocturno') factor = 1.75;
         if (tipo_extra === 'Dominical') factor = 1.75;
-        if (tipo_extra === 'Recargo_Nocturno') factor = 0.35; // Solo el recargo sobre la hora ordinaria
+        if (tipo_extra === 'Recargo_Nocturno') factor = 0.35;
         
         const valorExtras = Math.round((valorHora * factor) * parseFloat(extras || 0));
-        
         const totalDevengado = sueldoBasico + auxilio + valorExtras;
 
-        // 2. Deducciones Salud y Pensión
         const ibc = sueldoBasico + (tipo_extra === 'Recargo_Nocturno' ? 0 : valorExtras); 
         const salud = Math.round(ibc * 0.04);
         const pension = Math.round(ibc * 0.04);
         const neto = totalDevengado - (salud + pension);
 
-        // 3. Guardar en DB
-        const [resNom] = await connection.query(
+        await connection.query(
             `INSERT INTO nominas (empleado_id, nombre_empleado, dias_trabajados, salario_base, total_devengado, total_deducido, neto_pagar, responsable, metodo_pago, banco, nro_cuenta, salud, pension, horas_extras) 
              VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
             [emp.id, emp.nombre, dias, SALARIO_EMPLEADO, totalDevengado, (salud + pension), neto, responsable, metodo_pago, banco || 'Efectivo', cuenta || 'N/A', salud, pension, valorExtras]
         );
 
-        // 4. Asiento Contable
         const [comp] = await connection.query("INSERT INTO comprobantes (tipo, descripcion, responsable, total) VALUES (?,?,?,?)", 
             ['Pago Nómina', `Nómina 2026 - ${emp.nombre} (${tipo_extra})`, responsable, neto]);
         
@@ -169,15 +141,12 @@ app.post('/nomina/liquidar', async (req, res) => {
         const cuentaSalida = metodo_pago === 'Efectivo' ? '1105' : '1110';
         await connection.query("INSERT INTO asientos (comprobante_id, cuenta_codigo, debito, credito) VALUES (?,? ,?,?)", [compId, cuentaSalida, 0, neto]);
 
-       // 5. Correo con diseño moderno 2026 (PROTEGIDO)
         try {
-            console.log(`Intentando enviar correo de nómina a: ${emp.email}`);
             await transporter.sendMail({
                 from: '"AccuCloud Nómina" <crisplusplay@gmail.com>',
                 to: emp.email,
                 subject: `Comprobante Nómina Electrónica - ${emp.nombre}`,
-                html: `
-                    <div style="font-family: 'Helvetica', sans-serif; max-width: 550px; margin: auto; border: 1px solid #f0f0f0; border-radius: 40px; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.05);">
+                html: `<div style="font-family: 'Helvetica', sans-serif; max-width: 550px; margin: auto; border: 1px solid #f0f0f0; border-radius: 40px; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.05);">
                         <div style="background: #0f172a; padding: 50px 40px; text-align: center; color: white;">
                             <h1 style="margin: 0; font-size: 32px; font-weight: 900; letter-spacing: -1.5px;">AccuCloud <span style="color: #3b82f6;">.</span></h1>
                             <p style="opacity: 0.6; font-size: 11px; text-transform: uppercase; letter-spacing: 3px; margin-top: 10px;">Recibo de Pago Oficial 2026</p>
@@ -201,10 +170,9 @@ app.post('/nomina/liquidar', async (req, res) => {
                         </div>
                     </div>`
             });
-            console.log("✅ Correo de nómina enviado con éxito");
+            console.log("✅ Correo enviado");
         } catch (mailError) {
-            // ESTO EVITA QUE EL SERVIDOR SE CAIGA SI EL CORREO FALLA
-            console.error("❌ Error de envío de correo, pero la nómina se guardó:", mailError.message);
+            console.error("❌ El correo falló, pero la nómina se guardó:", mailError.message);
         }
 
         await connection.commit();
@@ -212,144 +180,75 @@ app.post('/nomina/liquidar', async (req, res) => {
 
     } catch (e) { 
         await connection.rollback(); 
-        console.error("❌ Error fatal en liquidación:", e.message);
+        console.error("❌ Error fatal:", e.message);
         res.status(500).json({ success: false, message: e.message }); 
     } finally { connection.release(); }
+}); // <--- AQUÍ FALTABA ESTO
 
 // ================= RUTAS DE CONTABILIDAD PROFESIONAL =================
 
-// 1. Libro Diario: Obtiene todos los asientos agrupados por comprobante
 app.get('/contabilidad/diario', async (req, res) => {
     try {
-        const sql = `
-            SELECT 
-                c.id as comprobante_id,
-                c.fecha,
-                c.tipo as tipo_doc,
-                c.descripcion,
-                a.cuenta_codigo,
-                p.nombre as cuenta_nombre,
-                a.debito,
-                a.credito
-            FROM comprobantes c
-            JOIN asientos a ON c.id = a.comprobante_id
-            JOIN plan_cuentas p ON a.cuenta_codigo = p.codigo
-            ORDER BY c.fecha DESC, c.id DESC`;
+        const sql = `SELECT c.id as comprobante_id, c.fecha, c.tipo as tipo_doc, c.descripcion, a.cuenta_codigo, p.nombre as cuenta_nombre, a.debito, a.credito
+            FROM comprobantes c JOIN asientos a ON c.id = a.comprobante_id JOIN plan_cuentas p ON a.cuenta_codigo = p.codigo ORDER BY c.fecha DESC, c.id DESC`;
         const [rows] = await pool.query(sql);
         res.json(rows);
     } catch (e) { res.status(500).send(e.message); }
 });
 
-// 2. Balance de Prueba: Sumas y saldos por cuenta
 app.get('/contabilidad/balance', async (req, res) => {
     try {
-        const sql = `
-            SELECT 
-                p.codigo, 
-                p.nombre, 
-                p.tipo,
-                IFNULL(SUM(a.debito), 0) as total_debito, 
-                IFNULL(SUM(a.credito), 0) as total_credito,
-                (IFNULL(SUM(a.debito), 0) - IFNULL(SUM(a.credito), 0)) as saldo
-            FROM plan_cuentas p
-            LEFT JOIN asientos a ON p.codigo = a.cuenta_codigo
-            GROUP BY p.codigo
-            HAVING total_debito > 0 OR total_credito > 0
-            ORDER BY p.codigo ASC`;
+        const sql = `SELECT p.codigo, p.nombre, p.tipo, IFNULL(SUM(a.debito), 0) as total_debito, IFNULL(SUM(a.credito), 0) as total_credito, (IFNULL(SUM(a.debito), 0) - IFNULL(SUM(a.credito), 0)) as saldo
+            FROM plan_cuentas p LEFT JOIN asientos a ON p.codigo = a.cuenta_codigo GROUP BY p.codigo HAVING total_debito > 0 OR total_credito > 0 ORDER BY p.codigo ASC`;
         const [rows] = await pool.query(sql);
         res.json(rows);
     } catch (e) { res.status(500).send(e.message); }
 });
 
-// Ventas, Productos y otros...
+// Ventas
 app.get('/ventas', async(r,s)=>{const[d]=await pool.query("SELECT * FROM ventas ORDER BY fecha DESC");s.json(d)});
 app.post('/ventas', async (r, s) => {
     const c = await pool.getConnection();
     try {
         await c.beginTransaction();
         const { producto_id, nombre_producto, cantidad, precio_unitario, responsable, turno_id, metodo_pago, es_electronica, cliente, pago_recibido, cambio } = r.body;
-        
         const tot = cantidad * precio_unitario;
-
-        // 1. Guardar Venta
         const [resVenta] = await c.query(
             "INSERT INTO ventas (producto_id, nombre_producto, cantidad, total, estado, responsable, turno_id, metodo_pago, dinero_recibido, cambio) VALUES (?,?,?,?,?,?,?,?,?,?)",
             [producto_id, nombre_producto, cantidad, tot, 'Pagada', responsable, turno_id, metodo_pago, pago_recibido || tot, cambio || 0]
         );
 
-        // 2. Lógica de Envío de Factura Electrónica (PROTEGIDO)
         if (es_electronica && cliente && cliente.email) {
             try {
-                console.log(`Intentando enviar factura a: ${cliente.email}`);
                 await transporter.sendMail({
                     from: '"Facturación AccuCloud" <crisplusplay@gmail.com>',
                     to: cliente.email,
-                    subject: `Factura Electrónica No. POS-${resVenta.insertId}`,
-                    html: `
-                        <div style="font-family: sans-serif; padding: 40px; background: #f8fafc;">
-                            <div style="max-width: 600px; margin: auto; background: white; border-radius: 30px; padding: 40px; box-shadow: 0 10px 30px rgba(0,0,0,0.05);">
-                                <h1 style="color: #2563eb; margin: 0;">AccuCloud <span style="font-weight:100">.</span></h1>
-                                <p style="color: #64748b;">Hola <b>${cliente.nombre}</b>, gracias por tu compra.</p>
-                                <hr style="border: none; border-top: 1px solid #f1f5f9; margin: 30px 0;" />
-                                <table style="width: 100%; border-collapse: collapse;">
-                                    <tr>
-                                        <td style="padding: 10px 0; font-weight: bold;">${nombre_producto} x ${cantidad}</td>
-                                        <td style="padding: 10px 0; text-align: right; font-weight: bold;">$${tot.toLocaleString()}</td>
-                                    </tr>
-                                    <tr>
-                                        <td style="padding: 30px 0 10px 0; font-size: 20px; font-weight: 900; border-top: 2px dashed #f1f5f9;">TOTAL PAGADO</td>
-                                        <td style="padding: 30px 0 10px 0; text-align: right; font-size: 24px; font-weight: 900; color: #2563eb;">$${tot.toLocaleString()}</td>
-                                    </tr>
-                                </table>
-                                <p style="font-size: 10px; color: #cbd5e1; margin-top: 40px; text-align: center;">Documento oficial generado por AccuCloud ERP 2026</p>
-                            </div>
-                        </div>`
+                    subject: `Factura POS-${resVenta.insertId}`,
+                    html: `<h1>Gracias por tu compra</h1><p>Total: $${tot.toLocaleString()}</p>`
                 });
-                console.log("✅ Correo de venta enviado");
-            } catch (mailError) {
-                console.error("❌ El correo de venta falló pero la venta se guardó:", mailError.message);
-            }
+            } catch (mailError) { console.error("Error correo venta:", mailError.message); }
         }
-
         await c.commit();
         s.json({ success: true, id: resVenta.insertId });
-    } catch (e) { 
-        await c.rollback(); 
-        s.status(500).json({ success: false, message: e.message }); 
-    } finally { c.release(); }
+    } catch (e) { await c.rollback(); s.status(500).json({ success: false, message: e.message }); }
+    finally { c.release(); }
 });
+
 app.post('/productos/importar', async (r, s) => {
     const c = await pool.getConnection();
     try {
         await c.beginTransaction();
         const { productos, responsable } = r.body;
-
         for (const p of productos) {
-            // 1. Insertar o actualizar producto por SKU
-            await c.query(
-                `INSERT INTO productos (nombre, sku, precio, stock, categoria, min_stock) 
-                 VALUES (?,?,?,?,?,?) 
-                 ON DUPLICATE KEY UPDATE stock = stock + VALUES(stock), precio = VALUES(precio)`,
-                [p.nombre, p.sku, p.precio, p.stock, 'General', p.min_stock || 5]
-            );
-
-            // 2. Registrar movimiento en el Kardex
-            await c.query(
-                "INSERT INTO movimientos (producto, tipo, cantidad, responsable) VALUES (?,?,?,?)",
-                [p.nombre, 'Carga Masiva', p.stock, responsable || 'Sistema']
-            );
+            await c.query(`INSERT INTO productos (nombre, sku, precio, stock, categoria, min_stock) VALUES (?,?,?,?,?,?) ON DUPLICATE KEY UPDATE stock = stock + VALUES(stock), precio = VALUES(precio)`, [p.nombre, p.sku, p.precio, p.stock, 'General', p.min_stock || 5]);
+            await c.query("INSERT INTO movimientos (producto, tipo, cantidad, responsable) VALUES (?,?,?,?)", [p.nombre, 'Carga Masiva', p.stock, responsable || 'Sistema']);
         }
-
         await c.commit();
         s.json({ success: true });
-    } catch (e) {
-        await c.rollback();
-        console.error(e);
-        s.status(500).send(e.message);
-    } finally {
-        c.release();
-    }
+    } catch (e) { await c.rollback(); s.status(500).send(e.message); }
+    finally { c.release(); }
 });
+
 app.get('/turnos/activo/:id', async(r,s)=>{const[d]=await pool.query("SELECT * FROM turnos WHERE usuario_id=? AND estado='Abierto'",[r.params.id]);s.json(d[0]||null)});
 app.post('/turnos/iniciar', async(r,s)=>{try{const{usuario_id,nombre_usuario,base_caja}=r.body;await pool.query("INSERT INTO turnos (usuario_id,nombre_usuario,base_caja) VALUES (?,?,?)",[usuario_id,nombre_usuario,base_caja||0]);s.json({success:true});}catch(e){s.status(500).send(e.message)}});
 app.put('/turnos/finalizar', async(r,s)=>{try{const{turno_id}=r.body;const[v]=await pool.query("SELECT IFNULL(SUM(total),0) as total FROM ventas WHERE turno_id=?",[turno_id]);await pool.query("UPDATE turnos SET fecha_fin=NOW(),estado='Cerrado',total_vendido=? WHERE id=?",[v[0].total,turno_id]);s.json({success:true,message:"Cerrado"});}catch(e){s.status(500).send(e.message)}});
@@ -359,7 +258,7 @@ app.post('/productos', async(r,s)=>{try{const{nombre,sku,precio,stock,categoria,
 
 app.get('/nomina/historial', async (req, res) => { const [r] = await pool.query("SELECT * FROM nominas ORDER BY fecha_pago DESC"); res.json(r); });
 
-app.get(/.*/, (req, res) => {
+app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, '../frontend/build', 'index.html'));
 });
 
