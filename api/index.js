@@ -10,16 +10,16 @@ app.use(express.json({ limit: '50mb' }));
 
 // 1. CONFIGURACIÓN DE BASE DE DATOS (AIVEN CLOUD)
 const dbConfig = {
-    host: process.env.DB_HOST || 'mysql-14f55f3e-cristiancaicedo68-cf3e.h.aivencloud.com',
-    user: process.env.DB_USER || 'avnadmin',
-    password: process.env.DB_PASSWORD || 'hzdq dzzk fooa ocdk', 
-    database: process.env.DB_NAME || 'defaultdb',
-    port: process.env.DB_PORT || 14489,
+    host: process.env.DB_HOST,
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD, 
+    database: process.env.DB_NAME,
+    port: process.env.DB_PORT,
     ssl: { rejectUnauthorized: false } 
 };
 const pool = mysql.createPool(dbConfig);
 
-// 1. TRANSPORTER ACTUALIZADO (MÁS SEGURO PARA RENDER)
+// 2. CONFIGURACIÓN CORREO
 const transporter = nodemailer.createTransport({
     host: "smtp.gmail.com",
     port: 465,
@@ -31,225 +31,132 @@ const transporter = nodemailer.createTransport({
     tls: { rejectUnauthorized: false }
 });
 
-// ==========================================
-// 3. RUTAS DE LA API
-// ==========================================
+// ================= RUTAS DE LA API =================
 
-// Registro de usuarios
-app.post('/register', async (req, res) => {
+app.post('/api/register', async (req, res) => {
     try {
         const { nombre, email, password } = req.body;
-        if (!nombre || !email || !password) return res.status(400).json({ success: false, message: "Faltan datos" });
         await pool.query("INSERT INTO usuarios (nombre, email, password, cargo) VALUES (?, ?, ?, ?)", [nombre, email, password, 'Admin']);
-        res.json({ success: true, message: "Registrado con éxito" });
-    } catch (err) {
-        res.status(500).json({ success: false, message: err.message });
-    }
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
 
-// Login
-app.post('/login', async (req, res) => {
+app.post('/api/login', async (req, res) => {
     try { 
         const [rows] = await pool.query("SELECT * FROM usuarios WHERE email = ? AND password = ?", [req.body.email, req.body.password]); 
-        res.json(rows.length > 0 ? { success: true, user: rows[0] } : { success: false, message: "Datos incorrectos" }); 
+        res.json(rows.length > 0 ? { success: true, user: rows[0] } : { success: false }); 
     } catch (err) { res.status(500).send(err.message); }
 });
 
-// Dashboard Data
-app.get('/dashboard-data', async (req, res) => {
+app.get('/api/dashboard-data', async (req, res) => {
     try {
         const [mayor] = await pool.query("SELECT IFNULL(SUM(total), 0) as total FROM ventas");
         const [bases] = await pool.query("SELECT IFNULL(SUM(base_caja), 0) as total FROM turnos WHERE estado = 'Abierto'");
         const [ventasTurno] = await pool.query("SELECT IFNULL(SUM(v.total), 0) as total FROM ventas v JOIN turnos t ON v.turno_id = t.id WHERE t.estado = 'Abierto'");
         const [prod] = await pool.query("SELECT COUNT(*) as total, IFNULL(SUM(precio * stock), 0) as valor, IFNULL(SUM(CASE WHEN stock <= min_stock THEN 1 ELSE 0 END), 0) as low FROM productos");
         const [recent] = await pool.query("SELECT * FROM ventas ORDER BY fecha DESC LIMIT 5");
-        res.json({ 
-            cajaMayor: Number(mayor[0].total), 
-            cajaMenor: Number(bases[0].total) + Number(ventasTurno[0].total), 
-            totalProductos: Number(prod[0].total), 
-            valorInventario: Number(prod[0].valor), 
-            lowStock: Number(prod[0].low), 
-            recentSales: recent 
-        });
+        res.json({ cajaMayor: Number(mayor[0].total), cajaMenor: Number(bases[0].total) + Number(ventasTurno[0].total), valorInventario: Number(prod[0].valor), lowStock: Number(prod[0].low), recentSales: recent });
     } catch (e) { res.status(500).send(e.message); }
 });
 
-// Nómina Liquidar 2026 (SMLV $1.750.905)
-app.post('/nomina/liquidar', async (req, res) => {
+app.get('/api/empleados', async (req, res) => {
+    const [rows] = await pool.query("SELECT * FROM empleados");
+    res.json(rows);
+});
+
+app.post('/api/empleados', async (req, res) => {
+    const { nombre, documento, cargo, salario, email, eps, arl, pension } = req.body;
+    await pool.query("INSERT INTO empleados (nombre, documento, cargo, salario, email, eps, arl, pension_fund) VALUES (?,?,?,?,?,?,?,?)", [nombre, documento, cargo, salario, email, eps, arl, pension]);
+    res.json({ success: true });
+});
+
+app.post('/api/nomina/liquidar', async (req, res) => {
     const connection = await pool.getConnection();
     try {
         await connection.beginTransaction();
         const { empleado_id, dias, extras, tipo_extra, responsable, metodo_pago, banco, cuenta } = req.body;
-        
         const [empRows] = await connection.query("SELECT * FROM empleados WHERE id = ?", [empleado_id]);
         const emp = empRows[0];
-
-        const SMLV_2026 = 1750905;
-        const AUX_TRANS_2026 = 249095; 
-        const SALARIO_EMPLEADO = parseFloat(emp.salario);
-
-        const sueldoBasico = Math.round((SALARIO_EMPLEADO / 30) * dias);
-        const auxilio = (SALARIO_EMPLEADO <= (SMLV_2026 * 2)) ? Math.round((AUX_TRANS_2026 / 30) * dias) : 0;
-        
-        const valorHora = SALARIO_EMPLEADO / 240;
-        let factor = 1.25;
-        if (tipo_extra === 'Nocturno' || tipo_extra === 'Dominical') factor = 1.75;
+        const SALARIO = parseFloat(emp.salario);
+        const sueldoBasico = Math.round((SALARIO / 30) * dias);
+        const auxilio = (SALARIO <= 3501810) ? Math.round((249095 / 30) * dias) : 0;
+        let factor = 1.25; 
+        if (tipo_extra === 'Nocturno') factor = 1.75;
+        if (tipo_extra === 'Dominical') factor = 1.75;
         if (tipo_extra === 'Recargo_Nocturno') factor = 0.35;
-        
-        const valorExtras = Math.round((valorHora * factor) * parseFloat(extras || 0));
+        const valorExtras = Math.round((SALARIO / 240 * factor) * parseFloat(extras || 0));
         const totalDevengado = sueldoBasico + auxilio + valorExtras;
-
         const ibc = sueldoBasico + (tipo_extra === 'Recargo_Nocturno' ? 0 : valorExtras); 
         const salud = Math.round(ibc * 0.04);
         const pension = Math.round(ibc * 0.04);
-        const totalDeducido = salud + pension;
-        const neto = totalDevengado - totalDeducido;
+        const neto = totalDevengado - (salud + pension);
 
-        await connection.query(
-            `INSERT INTO nominas (empleado_id, nombre_empleado, dias_trabajados, salario_base, total_devengado, total_deducido, neto_pagar, responsable, metodo_pago, banco, nro_cuenta, salud, pension, horas_extras) 
-             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-            [emp.id, emp.nombre, dias, SALARIO_EMPLEADO, totalDevengado, totalDeducido, neto, responsable, metodo_pago, banco || 'Efectivo', cuenta || 'N/A', salud, pension, valorExtras]
-        );
+        await connection.query(`INSERT INTO nominas (empleado_id, nombre_empleado, dias_trabajados, salario_base, total_devengado, total_deducido, neto_pagar, responsable, metodo_pago, banco, nro_cuenta, salud, pension, horas_extras) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, [emp.id, emp.nombre, dias, SALARIO, totalDevengado, (salud + pension), neto, responsable, metodo_pago, banco || 'Efectivo', cuenta || 'N/A', salud, pension, valorExtras]);
 
-        const [comp] = await connection.query("INSERT INTO comprobantes (tipo, descripcion, responsable, total) VALUES (?,?,?,?)", 
-            ['Pago Nómina', `Nómina 2026 - ${emp.nombre}`, responsable, neto]);
+        const [comp] = await connection.query("INSERT INTO comprobantes (tipo, descripcion, responsable, total) VALUES (?,?,?,?)", ['Pago Nómina', `Nómina - ${emp.nombre}`, responsable, neto]);
         const compId = comp.insertId;
         await connection.query("INSERT INTO asientos (comprobante_id, cuenta_codigo, debito, credito) VALUES (?,?,?,?)", [compId, '5105', totalDevengado, 0]);
-        await connection.query("INSERT INTO asientos (comprobante_id, cuenta_codigo, debito, credito) VALUES (?,?,?,?)", [compId, '2370', 0, totalDeducido]);
+        await connection.query("INSERT INTO asientos (comprobante_id, cuenta_codigo, debito, credito) VALUES (?,?,?,?)", [compId, '2370', 0, (salud + pension)]);
         const cuentaSalida = metodo_pago === 'Efectivo' ? '1105' : '1110';
         await connection.query("INSERT INTO asientos (comprobante_id, cuenta_codigo, debito, credito) VALUES (?,?,?,?)", [compId, cuentaSalida, 0, neto]);
 
         try {
             await transporter.sendMail({
-                from: '"Nómina AccuCloud" <crisplusplay@gmail.com>',
-                to: emp.email,
-                subject: `Comprobante Nómina 2026 - ${emp.nombre}`,
-                html: `<div style="font-family:sans-serif; border:1px solid #eee; padding:30px; border-radius:30px;">
-                        <h2 style="color:#2563eb;">Recibo de Pago 2026</h2>
-                        <p>Hola <b>${emp.nombre}</b>, se ha procesado tu pago.</p>
-                        <p>Total Neto: <b>$${neto.toLocaleString()}</b></p>
-                       </div>`
+                from: '"AccuCloud" <crisplusplay@gmail.com>', to: emp.email, subject: `Pago Nómina`,
+                html: `<h1>Pago de $${neto.toLocaleString()}</h1>`
             });
-        } catch (mailError) { console.error("Error correo nómina:", mailError.message); }
+        } catch (e) { console.log("Error correo"); }
 
         await connection.commit();
-        res.json({ success: true, message: "Liquidado correctamente" });
-    } catch (e) { 
-        await connection.rollback(); 
-        res.status(500).json({ success: false, message: e.message }); 
-    } finally { connection.release(); }
+        res.json({ success: true });
+    } catch (e) { await connection.rollback(); res.status(500).json({ success: false, message: e.message }); }
+    finally { connection.release(); }
 });
 
-// 2. RUTA DE VENTAS PARA MÚLTIPLES PRODUCTOS
-app.post('/ventas', async (r, s) => {
+app.get('/api/contabilidad/diario', async (req, res) => {
+    const sql = `SELECT c.id as comprobante_id, c.fecha, c.tipo as tipo_doc, c.descripcion, a.cuenta_codigo, p.nombre as cuenta_nombre, a.debito, a.credito FROM comprobantes c JOIN asientos a ON c.id = a.comprobante_id JOIN plan_cuentas p ON a.cuenta_codigo = p.codigo ORDER BY c.fecha DESC`;
+    const [rows] = await pool.query(sql); res.json(rows);
+});
+
+app.get('/api/contabilidad/balance', async (req, res) => {
+    const sql = `SELECT p.codigo, p.nombre, p.tipo, IFNULL(SUM(a.debito), 0) as total_debito, IFNULL(SUM(a.credito), 0) as total_credito, (IFNULL(SUM(a.debito), 0) - IFNULL(SUM(a.credito), 0)) as saldo FROM plan_cuentas p LEFT JOIN asientos a ON p.codigo = a.cuenta_codigo GROUP BY p.codigo HAVING total_debito > 0 OR total_credito > 0 ORDER BY p.codigo ASC`;
+    const [rows] = await pool.query(sql); res.json(rows);
+});
+
+app.post('/api/ventas', async (r, s) => {
     const c = await pool.getConnection();
     try {
         await c.beginTransaction();
         const { productos, responsable, turno_id, metodo_pago, es_electronica, cliente, pago_recibido, cambio } = r.body;
-        
-        if (!turno_id) throw new Error("Inicia Turno primero.");
-
-        let totalVenta = 0;
-        let listaHtml = ""; // Para el correo
-
-        // Procesar cada producto del carrito
         for (const p of productos) {
-            const subtotal = p.cantidad * p.precio;
-            totalVenta += subtotal;
-            listaHtml += `<li>${p.nombre} x ${p.cantidad} = $${subtotal.toLocaleString()}</li>`;
-
-            // 1. Restar Stock
+            const tot = p.cantidad * p.precio;
+            await c.query("INSERT INTO ventas (producto_id, nombre_producto, cantidad, total, estado, responsable, turno_id, metodo_pago, dinero_recibido, cambio) VALUES (?,?,?,?,?,?,?,?,?,?)", [p.id, p.nombre, p.cantidad, tot, 'Pagada', responsable, turno_id, metodo_pago, pago_recibido, cambio]);
             await c.query("UPDATE productos SET stock = stock - ? WHERE id = ?", [p.cantidad, p.id]);
-
-            // 2. Guardar cada item en la tabla ventas
-            await c.query(
-                "INSERT INTO ventas (producto_id, nombre_producto, cantidad, total, estado, responsable, turno_id, metodo_pago, dinero_recibido, cambio) VALUES (?,?,?,?,?,?,?,?,?,?)",
-                [p.id, p.nombre, p.cantidad, subtotal, 'Pagada', responsable, turno_id, metodo_pago, pago_recibido || 0, cambio || 0]
-            );
         }
-
-        // 3. Factura Electrónica por Correo
-        if (es_electronica && cliente?.email) {
-            try {
-                await transporter.sendMail({
-                    from: '"Facturación AccuCloud" <crisplusplay@gmail.com>',
-                    to: cliente.email,
-                    subject: `Factura Electrónica AccuCloud`,
-                    html: `
-                        <div style="font-family: sans-serif; padding: 30px; border: 1px solid #eee; border-radius: 20px;">
-                            <h2 style="color: #2563eb;">Factura de Venta</h2>
-                            <p>Hola <b>${cliente.nombre}</b>, aquí tienes el detalle de tu compra:</p>
-                            <ul>${listaHtml}</ul>
-                            <hr/>
-                            <h2 style="text-align: right;">TOTAL: $${totalVenta.toLocaleString()}</h2>
-                        </div>`
-                });
-            } catch (mailErr) { console.error("Error correo venta:", mailErr.message); }
-        }
-
-        await c.commit();
-        s.json({ success: true });
-    } catch (e) { 
-        await c.rollback(); 
-        s.status(500).json({ success: false, message: e.message }); 
-    } finally { c.release(); }
+        await c.commit(); s.json({ success: true });
+    } catch (e) { await c.rollback(); s.status(500).json({ success: false, message: e.message }); }
+    finally { c.release(); }
 });
 
-// Contabilidad Profesional
-app.get('/contabilidad/diario', async (req, res) => {
-    try {
-        const sql = `SELECT c.id as comprobante_id, c.fecha, c.tipo as tipo_doc, c.descripcion, a.cuenta_codigo, p.nombre as cuenta_nombre, a.debito, a.credito
-            FROM comprobantes c JOIN asientos a ON c.id = a.comprobante_id JOIN plan_cuentas p ON a.cuenta_codigo = p.codigo ORDER BY c.fecha DESC, c.id DESC`;
-        const [rows] = await pool.query(sql); res.json(rows);
-    } catch (e) { res.status(500).send(e.message); }
-});
+app.get('/api/productos', async(r,s)=>{const[d]=await pool.query("SELECT * FROM productos");s.json(d)});
 
-app.get('/contabilidad/balance', async (req, res) => {
-    try {
-        const sql = `SELECT p.codigo, p.nombre, p.tipo, IFNULL(SUM(a.debito), 0) as total_debito, IFNULL(SUM(a.credito), 0) as total_credito, (IFNULL(SUM(a.debito), 0) - IFNULL(SUM(a.credito), 0)) as saldo
-            FROM plan_cuentas p LEFT JOIN asientos a ON p.codigo = a.cuenta_codigo GROUP BY p.codigo HAVING total_debito > 0 OR total_credito > 0 ORDER BY p.codigo ASC`;
-        const [rows] = await pool.query(sql); res.json(rows);
-    } catch (e) { res.status(500).send(e.message); }
-});
-
-app.get('/productos', async(r,s)=>{const[d]=await pool.query("SELECT * FROM productos");s.json(d)});
-
-app.post('/productos/importar', async (r, s) => {
+app.post('/api/productos/importar', async (r, s) => {
     const c = await pool.getConnection();
     try {
         await c.beginTransaction();
-        const { productos, responsable } = r.body;
-        for (const p of productos) {
-            await c.query(`INSERT INTO productos (nombre, sku, precio, stock, categoria, min_stock) VALUES (?,?,?,?,?,?) ON DUPLICATE KEY UPDATE stock = stock + VALUES(stock), precio = VALUES(precio)`, [p.nombre, p.sku, p.precio, p.stock, 'General', p.min_stock || 5]);
-            await c.query("INSERT INTO movimientos (producto, tipo, cantidad, responsable) VALUES (?,?,?,?)", [p.nombre, 'Carga Masiva', p.stock, responsable || 'Sistema']);
+        for (const p of r.body.productos) {
+            await c.query(`INSERT INTO productos (nombre, sku, precio, stock, categoria, min_stock) VALUES (?,?,?,?,?,?) ON DUPLICATE KEY UPDATE stock = stock + VALUES(stock)`, [p.nombre, p.sku, p.precio, p.stock, 'General', 5]);
         }
         await c.commit(); s.json({ success: true });
     } catch (e) { await c.rollback(); s.status(500).send(e.message); }
     finally { c.release(); }
 });
 
-// Empleados y Turnos
-app.get('/empleados', async(r,s)=>{const[d]=await pool.query("SELECT * FROM empleados");s.json(d)});
-app.post('/empleados', async(r,s)=>{
-    const { nombre, documento, cargo, salario, email, eps, arl, pension } = r.body;
-    await pool.query("INSERT INTO empleados (nombre, documento, cargo, salario, email, eps, arl, pension_fund) VALUES (?,?,?,?,?,?,?,?)", [nombre, documento, cargo, salario, email, eps, arl, pension]);
-    s.json({success:true});
-});
+app.get('/api/turnos/activo/:id', async(r,s)=>{const[d]=await pool.query("SELECT * FROM turnos WHERE usuario_id=? AND estado='Abierto'",[r.params.id]);s.json(d[0]||null)});
+app.post('/api/turnos/iniciar', async(r,s)=>{const{usuario_id,nombre_usuario,base_caja}=r.body;await pool.query("INSERT INTO turnos (usuario_id,nombre_usuario,base_caja) VALUES (?,?,?)",[usuario_id,nombre_usuario,base_caja]);s.json({success:true});});
+app.put('/api/turnos/finalizar', async(r,s)=>{const[v]=await pool.query("SELECT IFNULL(SUM(total),0) as total FROM ventas WHERE turno_id=?",[r.body.turno_id]);await pool.query("UPDATE turnos SET fecha_fin=NOW(),estado='Cerrado',total_vendido=? WHERE id=?",[v[0].total,r.body.turno_id]);s.json({success:true});});
+app.get('/api/turnos/historial', async(r,s)=>{const[d]=await pool.query("SELECT * FROM turnos ORDER BY fecha_inicio DESC");s.json(d)});
+app.get('/api/nomina/historial', async(r,s)=>{const[d]=await pool.query("SELECT * FROM nominas ORDER BY fecha_pago DESC");s.json(d)});
 
-app.get('/turnos/activo/:id', async(r,s)=>{const[d]=await pool.query("SELECT * FROM turnos WHERE usuario_id=? AND estado='Abierto'",[r.params.id]);s.json(d[0]||null)});
-app.post('/turnos/iniciar', async(r,s)=>{try{const{usuario_id,nombre_usuario,base_caja}=r.body;await pool.query("INSERT INTO turnos (usuario_id,nombre_usuario,base_caja) VALUES (?,?,?)",[usuario_id,nombre_usuario,base_caja||0]);s.json({success:true});}catch(e){s.status(500).send(e.message)}});
-app.put('/turnos/finalizar', async(r,s)=>{try{const{turno_id}=r.body;const[v]=await pool.query("SELECT IFNULL(SUM(total),0) as total FROM ventas WHERE turno_id=?",[turno_id]);await pool.query("UPDATE turnos SET fecha_fin=NOW(),estado='Cerrado',total_vendido=? WHERE id=?",[v[0].total,turno_id]);s.json({success:true,message:"Cerrado"});}catch(e){s.status(500).send(e.message)}});
-app.get('/turnos/historial', async(r,s)=>{const[d]=await pool.query("SELECT * FROM turnos ORDER BY fecha_inicio DESC");s.json(d)});
-app.get('/nomina/historial', async(r,s)=>{const[d]=await pool.query("SELECT * FROM nominas ORDER BY fecha_pago DESC");s.json(d)});
-
-// 4. SERVIR FRONTEND (ESTO SIEMPRE VA AL FINAL)
-app.use(express.static(path.join(__dirname, '../frontend/build')));
-
-// --- CAMBIO CLAVE AQUÍ: Usamos /.*/ para Node v22 ---
-app.get(/.*/, (req, res) => {
-    res.sendFile(path.join(__dirname, '../frontend/build', 'index.html'));
-});
-
-// 5. INICIAR
-const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => console.log(`🚀 Servidor UNIFICADO Listo en Puerto ${PORT}`));
+// EXPORTAR PARA VERCEL
+module.exports = app;

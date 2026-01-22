@@ -2,34 +2,28 @@ import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import * as XLSX from 'xlsx'; // <--- IMPORTACIÓN MOVIDA AL PRINCIPIO
+import * as XLSX from 'xlsx';
 import { 
-  LayoutDashboard, Package, ShoppingCart, Users, Search, DollarSign, 
-  AlertTriangle, TrendingUp, Edit, X, Wallet, Clock, Lock, CreditCard, 
-  Banknote, Landmark, Upload, Mail, Calculator, DownloadCloud, ScanBarcode, 
-  Plus, ChevronRight
+  LayoutDashboard, Package, ShoppingCart, Users, DollarSign, 
+  AlertTriangle, Wallet, Lock, Landmark, Mail, Calculator, 
+  ScanBarcode
 } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { BarChart, Bar, XAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 axios.defaults.headers.common['ngrok-skip-browser-warning'] = 'true';
 axios.defaults.baseURL = window.location.origin + '/api';
 
 const fmt = (number) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(number || 0);
 
-// ==========================================
-//    FUNCIÓN GLOBAL: IMPRESIÓN DE FACTURA
-// ==========================================
 const imprimirFactura = (cart, total, responsable, metodo, cliente, recibido, cambio) => {
     try {
         const doc = new jsPDF({ unit: 'mm', format: [80, 150 + (cart.length * 10)] }); 
         const ancho = 80;
-
         doc.setFontSize(14); doc.text("ACCUCLOUD ERP", ancho/2, 10, {align: 'center'});
         doc.setFontSize(8);
         doc.text(`Fecha: ${new Date().toLocaleString()}`, 5, 20);
         doc.text(`Cajero: ${responsable}`, 5, 24);
         doc.text(`Cliente: ${cliente?.nombre || 'General'}`, 5, 28);
-
         autoTable(doc, {
             startY: 35,
             margin: { left: 2, right: 2 },
@@ -38,31 +32,24 @@ const imprimirFactura = (cart, total, responsable, metodo, cliente, recibido, ca
             theme: 'plain',
             styles: { fontSize: 7 }
         });
-
         const finalY = doc.lastAutoTable.finalY + 5;
         doc.setFontSize(10);
         doc.text(`TOTAL: ${fmt(total)}`, ancho - 5, finalY, { align: 'right' });
         doc.setFontSize(7);
         doc.text(`Recibido: ${fmt(recibido)}`, 5, finalY + 5);
         doc.text(`Cambio: ${fmt(cambio)}`, 5, finalY + 9);
-
         window.open(doc.output('bloburl'), '_blank');
     } catch (e) { console.error(e); }
 };
 
-// ==========================================
-//           COMPONENTE PRINCIPAL
-// ==========================================
 function App() {
   const [user, setUser] = useState(null);
   const [isRegistering, setIsRegistering] = useState(false);
-
   if (!user) {
     return isRegistering ? 
       <RegisterScreen onBack={() => setIsRegistering(false)} /> : 
       <LoginScreen onLogin={setUser} onGoToRegister={() => setIsRegistering(true)} />;
   }
-
   return (
     <div className="font-sans text-slate-600 bg-slate-50 min-h-screen">
       <Dashboard user={user} onLogout={() => setUser(null)} />
@@ -76,14 +63,14 @@ function RegisterScreen({ onBack }) {
         e.preventDefault();
         try {
             await axios.post('/register', form);
-            window.alert("Empresa registrada.");
+            window.alert("Empresa registrada con éxito.");
             onBack();
         } catch (e) { window.alert("Error al registrar."); }
     };
     return (
         <div className="min-h-screen flex items-center justify-center bg-slate-900 p-4">
             <div className="bg-white p-10 rounded-[40px] shadow-2xl w-full max-w-md">
-                <h2 className="text-3xl font-black mb-2 text-slate-800">Nueva Cuenta</h2>
+                <h2 className="text-3xl font-black mb-2 text-slate-800 tracking-tighter">Nueva Cuenta</h2>
                 <form onSubmit={handleRegister} className="space-y-4">
                     <input className="w-full p-4 border rounded-2xl bg-slate-50" placeholder="Nombre Empresa" onChange={e => setForm({...form, nombre: e.target.value})} required />
                     <input className="w-full p-4 border rounded-2xl bg-slate-50" type="email" placeholder="Email" onChange={e => setForm({...form, email: e.target.value})} required />
@@ -110,13 +97,13 @@ function LoginScreen({ onLogin, onGoToRegister }) {
   return (
     <div className="min-h-screen flex items-center justify-center bg-blue-600 p-4">
       <div className="bg-white p-12 rounded-[50px] shadow-2xl w-full max-w-md">
-        <h1 className="text-5xl font-black text-center text-slate-800 tracking-tighter italic">AccuCloud<span className="text-blue-600">.</span></h1>
-        <form onSubmit={handle} className="space-y-4 mt-10">
+        <h1 className="text-5xl font-black text-center text-slate-800 mb-10 tracking-tighter italic">AccuCloud<span className="text-blue-600">.</span></h1>
+        <form onSubmit={handle} className="space-y-4">
           <input className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold" value={email} onChange={e => setEmail(e.target.value)} placeholder="Email" />
           <input type="password" className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold" value={password} onChange={e => setPassword(e.target.value)} placeholder="Contraseña" />
           <button className="w-full bg-slate-900 text-white font-black py-4 rounded-2xl shadow-xl">INGRESAR</button>
         </form>
-        <button onClick={onGoToRegister} className="w-full mt-6 text-blue-600 font-black text-sm hover:underline">REGISTRAR EMPRESA</button>
+        <button onClick={onGoToRegister} className="w-full mt-8 text-blue-600 font-black text-sm hover:underline">REGISTRAR EMPRESA</button>
       </div>
     </div>
   );
@@ -129,11 +116,10 @@ function Dashboard({ user, onLogout }) {
     if (user) axios.get(`/turnos/activo/${user.id}`).then(res => setTurnoActivo(res.data));
   }, [user]);
   useEffect(() => { recargarTurno(); }, [recargarTurno]);
-
   return (
     <div className="flex h-screen overflow-hidden bg-slate-50">
       <aside className="w-72 bg-white border-r flex flex-col z-20 shadow-xl px-6">
-        <div className="h-28 flex items-center font-black text-2xl text-slate-800 italic uppercase">ACCUCLOUD <span className="text-blue-600">.</span></div>
+        <div className="h-28 flex items-center font-black text-2xl text-slate-800 uppercase tracking-tighter italic">ACCUCLOUD <span className="text-blue-600">.</span></div>
         <nav className="flex-1 space-y-1 overflow-y-auto">
           <MenuButton icon={<LayoutDashboard size={20}/>} label="Dashboard" active={activeTab==='dashboard'} onClick={()=>setActiveTab('dashboard')} />
           <div className="px-4 text-[10px] font-black text-slate-300 uppercase mt-8 mb-4 tracking-[2px]">Operaciones</div>
@@ -151,7 +137,7 @@ function Dashboard({ user, onLogout }) {
       <main className="flex-1 overflow-auto p-10">
         <header className="flex justify-between items-center mb-10">
             <h2 className="text-4xl font-black text-slate-800 tracking-tighter capitalize">{activeTab}</h2>
-            {turnoActivo ? <div className="px-4 py-2 bg-green-100 text-green-700 rounded-xl text-xs font-black flex items-center gap-2"><div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div> CAJA ABIERTA</div> : <div className="px-4 py-2 bg-red-100 text-red-700 rounded-xl text-xs font-black">CAJA CERRADA</div>}
+            {turnoActivo ? <div className="px-4 py-2 bg-green-100 text-green-700 rounded-xl text-xs font-black flex items-center gap-2 shadow-sm"><div className="w-2 bg-green-500 h-2 rounded-full animate-pulse"></div> CAJA ABIERTA</div> : <div className="px-4 py-2 bg-red-100 text-red-700 rounded-xl text-xs font-black">CAJA CERRADA</div>}
         </header>
         {activeTab==='dashboard' && <ResumenView/>}
         {activeTab==='caja' && <CajaView user={user} turnoActivo={turnoActivo} onUpdate={recargarTurno}/>}
@@ -178,7 +164,7 @@ function ResumenView() {
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           <div className="bg-white p-10 rounded-[40px] shadow-sm border border-slate-100 h-96">
-              <h3 className="font-black text-slate-800 mb-6">Actividad Semanal</h3>
+              <h3 className="font-black text-slate-800 mb-6">Desempeño Semanal</h3>
               <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={chartData}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9"/>
@@ -191,7 +177,7 @@ function ResumenView() {
           <div className="bg-white p-10 rounded-[40px] shadow-sm border border-slate-100 h-96 overflow-auto">
               <h3 className="font-black text-slate-800 mb-6 tracking-tighter">Ventas Recientes</h3>
               {data.recentSales.map(v => (
-                  <div key={v.id} className="flex justify-between items-center p-4 bg-slate-50 rounded-2xl mb-2">
+                  <div key={v.id} className="flex justify-between items-center p-4 bg-slate-50 rounded-2xl mb-2 hover:bg-blue-50 transition-all">
                       <div className="text-sm font-bold text-slate-700">{v.nombre_producto}</div>
                       <span className="font-black text-slate-800">{fmt(v.total)}</span>
                   </div>
@@ -213,7 +199,7 @@ function CajaView({ user, turnoActivo, onUpdate }) {
             <div className="bg-white p-10 rounded-[40px] shadow-xl border border-blue-50 text-center flex flex-col justify-center">
                 <div className={`w-24 h-24 mx-auto rounded-[32px] flex items-center justify-center mb-8 ${turnoActivo ? 'bg-green-50 text-green-500' : 'bg-red-50 text-red-500'}`}>{turnoActivo ? <ScanBarcode size={48}/> : <Lock size={48}/>}</div>
                 <h3 className="text-3xl font-black mb-2">{turnoActivo ? "CAJA ABIERTA" : "CAJA CERRADA"}</h3>
-                {turnoActivo && <div className="bg-slate-50 p-6 rounded-3xl mb-8 text-left font-black">Ventas Hoy: <span className="text-green-600">{fmt(turnoActivo.total_vendido)}</span></div>}
+                {turnoActivo && <div className="bg-slate-50 p-6 rounded-3xl mb-8 text-left font-black tracking-tight">Ventas Hoy: <span className="text-green-600">{fmt(turnoActivo.total_vendido)}</span></div>}
                 <button onClick={async ()=>{
                     if(turnoActivo){ if(window.confirm("¿Cerrar?")) { await axios.put('/turnos/finalizar', { turno_id: turnoActivo.id }); onUpdate(); loadHistorial(); } }
                     else { const b = window.prompt("Base?", "0"); if(b) { await axios.post('/turnos/iniciar', { usuario_id: user.id, nombre_usuario: user.nombre, base_caja: b }); onUpdate(); loadHistorial(); } }
@@ -224,7 +210,9 @@ function CajaView({ user, turnoActivo, onUpdate }) {
             <div className="lg:col-span-2 bg-white rounded-[40px] shadow-sm border border-slate-100 overflow-hidden pr-2">
                 <table className="w-full text-left">
                     <thead className="bg-slate-50/50 text-[10px] font-black uppercase"><tr className="border-b"><th className="p-8">Responsable</th><th>Base</th><th className="text-right">Ventas</th><th className="p-8 text-center">Estado</th></tr></thead>
-                    <tbody>{historial.map(t => (<tr key={t.id} className="border-b hover:bg-slate-50"><td className="p-8 font-black">{t.nombre_usuario}</td><td>{fmt(t.base_caja)}</td><td className="text-right font-black text-blue-600">{fmt(t.total_vendido)}</td><td className="p-8 text-center uppercase text-[10px] font-black">{t.estado}</td></tr>))}</tbody>
+                    <tbody>{historial.map(t => (<tr key={t.id} className="border-b hover:bg-slate-50 transition">
+                        <td className="p-8 font-black">{t.nombre_usuario}</td><td>{fmt(t.base_caja)}</td><td className="text-right font-black text-blue-600">{fmt(t.total_vendido)}</td><td className="p-8 text-center uppercase text-[10px] font-black">{t.estado}</td>
+                    </tr>))}</tbody>
                 </table>
             </div>
         </div>
@@ -234,30 +222,21 @@ function CajaView({ user, turnoActivo, onUpdate }) {
 function VentasView({ user, turnoActivo }) {
   const [productos, setProductos] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
-  const [cart, setCart] = useState([]); // EL CARRITO
+  const [cart, setCart] = useState([]);
   const [metodo, setMetodo] = useState('Efectivo');
   const [pagaCon, setPagaCon] = useState('');
   const [esElectronica, setEsElectronica] = useState(false);
   const [cliente, setCliente] = useState({ nombre: '', nit: '', email: '', tel: '' });
-
   const load = useCallback(() => axios.get('/productos').then(res => setProductos(res.data)), []);
   useEffect(() => { load(); }, [load]);
-
   const totalVenta = cart.reduce((sum, p) => sum + (p.precio * p.cantidad), 0);
   const devuelta = (parseFloat(pagaCon) || 0) - totalVenta;
-
-  // Lógica para agregar al carrito (Pistola o Click)
   const addToCart = (prod) => {
       const existe = cart.find(item => item.id === prod.id);
-      if (existe) {
-          setCart(cart.map(item => item.id === prod.id ? { ...item, cantidad: item.cantidad + 1 } : item));
-      } else {
-          setCart([...cart, { ...prod, cantidad: 1 }]);
-      }
+      if (existe) { setCart(cart.map(item => item.id === prod.id ? { ...item, cantidad: item.cantidad + 1 } : item)); } 
+      else { setCart([...cart, { ...prod, cantidad: 1 }]); }
       setSearchTerm('');
   };
-
-  // Escucha la pistola de códigos
   useEffect(() => {
     let barcode = "";
     const handleKey = (e) => {
@@ -270,97 +249,55 @@ function VentasView({ user, turnoActivo }) {
     window.addEventListener('keypress', handleKey);
     return () => window.removeEventListener('keypress', handleKey);
   }, [productos, cart]);
-
   const procesar = async () => {
-      if(cart.length === 0) return window.alert("El carrito está vacío.");
+      if(cart.length === 0) return window.alert("Carrito vacío.");
       if(metodo === 'Efectivo' && (parseFloat(pagaCon) < totalVenta || !pagaCon)) return window.alert("Dinero insuficiente.");
-
       try {
           const res = await axios.post('/ventas', {
-              productos: cart,
-              responsable: user.nombre,
-              turno_id: turnoActivo.id,
-              metodo_pago: metodo,
-              es_electronica: esElectronica,
-              cliente: esElectronica ? cliente : null,
-              pago_recibido: pagaCon,
-              cambio: devuelta
+              productos: cart, responsable: user.nombre, turno_id: turnoActivo.id, metodo_pago: metodo,
+              es_electronica: esElectronica, cliente: esElectronica ? cliente : null, pago_recibido: pagaCon, cambio: devuelta
           });
-
           if(res.data.success) {
               imprimirFactura(cart, totalVenta, user.nombre, metodo, cliente, pagaCon, devuelta);
               setCart([]); setPagaCon(''); setEsElectronica(false);
-              window.alert("Venta procesada con éxito.");
-              load();
+              window.alert("Éxito."); load();
           }
-      } catch (e) { window.alert("Error en el servidor."); }
+      } catch (e) { window.alert("Error."); }
   };
-
-  if(!turnoActivo) return <div className="text-center p-20 opacity-30"><h2>INICIA TURNO PARA VENDER</h2></div>;
-
+  if(!turnoActivo) return <div className="text-center p-20 opacity-30"><h2>CAJA CERRADA</h2></div>;
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-fade-in">
         <div className="lg:col-span-2 bg-white p-8 rounded-[40px] shadow-xl border border-blue-50">
             <h3 className="font-black text-2xl mb-6 flex items-center gap-3"><ScanBarcode className="text-blue-600"/> TPV 2026</h3>
-            <input autoFocus className="w-full p-4 border rounded-2xl bg-slate-50 font-bold mb-6" placeholder="Escanea o busca producto..." value={searchTerm} onChange={e=>setSearchTerm(e.target.value)} />
-            
-            {/* Lista de búsqueda */}
-            {searchTerm && <div className="absolute bg-white border rounded-2xl shadow-2xl z-50 p-4 w-1/2 mt-[-20px]">{productos.filter(p=>p.nombre.toLowerCase().includes(searchTerm.toLowerCase()) || p.sku.includes(searchTerm)).map(p=>(<div key={p.id} onClick={()=>addToCart(p)} className="p-2 border-b cursor-pointer hover:bg-blue-50"><b>{p.nombre}</b> - {fmt(p.precio)}</div>))}</div>}
-
-            {/* TABLA DEL CARRITO */}
+            <input autoFocus className="w-full p-4 border rounded-2xl bg-slate-50 font-bold mb-6" placeholder="Escanea o busca..." value={searchTerm} onChange={e=>setSearchTerm(e.target.value)} />
+            {searchTerm && <div className="absolute bg-white border rounded-2xl shadow-2xl z-50 p-4 w-1/2 mt-[-20px]">{productos.filter(p=>p.nombre.toLowerCase().includes(searchTerm.toLowerCase()) || p.sku.includes(searchTerm)).map(p=>(<div key={p.id} onClick={()=>addToCart(p)} className="p-2 border-b cursor-pointer hover:bg-blue-50"><b>{p.nombre}</b></div>))}</div>}
             <div className="max-h-[300px] overflow-auto">
                 <table className="w-full text-left">
                     <thead className="text-[10px] font-black uppercase text-slate-400 border-b"><tr><th className="pb-4">Producto</th><th>Cant</th><th>Subtotal</th><th></th></tr></thead>
-                    <tbody>
-                        {cart.map((item, i) => (
-                            <tr key={i} className="border-b">
-                                <td className="py-4 font-bold">{item.nombre}</td>
-                                <td><input type="number" className="w-16 border rounded-lg text-center" value={item.cantidad} onChange={(e) => {
-                                    const val = parseInt(e.target.value);
-                                    setCart(cart.map(it => it.id === item.id ? { ...it, cantidad: val > 0 ? val : 1 } : it));
-                                }} /></td>
-                                <td className="font-black">{fmt(item.precio * item.cantidad)}</td>
-                                <td><button onClick={()=>setCart(cart.filter(it => it.id !== item.id))} className="text-red-500"><X size={16}/></button></td>
-                            </tr>
-                        ))}
-                    </tbody>
+                    <tbody>{cart.map((item, i) => (
+                        <tr key={i} className="border-b"><td className="py-4 font-bold">{item.nombre}</td><td><input type="number" className="w-16 border rounded-lg text-center" value={item.cantidad} onChange={(e) => setCart(cart.map(it => it.id === item.id ? { ...it, cantidad: parseInt(e.target.value) || 1 } : it))} /></td><td className="font-black">{fmt(item.precio * item.cantidad)}</td><td><button onClick={()=>setCart(cart.filter(it => it.id !== item.id))} className="text-red-500">X</button></td></tr>
+                    ))}</tbody>
                 </table>
             </div>
         </div>
-
-        {/* PANEL DE PAGO */}
         <div className="bg-white p-8 rounded-[40px] shadow-xl border flex flex-col justify-between">
             <div className="space-y-6">
-                <div className="text-center">
-                    <p className="text-xs font-black text-slate-400">TOTAL A COBRAR</p>
-                    <h1 className="text-5xl font-black text-blue-600">{fmt(totalVenta)}</h1>
-                </div>
-                <div className="flex gap-2">
-                    <button onClick={()=>setMetodo('Efectivo')} className={`flex-1 p-3 rounded-2xl font-bold border ${metodo==='Efectivo'?'bg-green-50 border-green-500 text-green-700':'bg-white'}`}>EFECTIVO</button>
-                    <button onClick={()=>setMetodo('Transferencia')} className={`flex-1 p-3 rounded-2xl font-bold border ${metodo==='Transferencia'?'bg-blue-50 border-blue-300 text-blue-700':'bg-white'}`}>BANCO</button>
-                </div>
-                {metodo === 'Efectivo' && (
-                    <div className="bg-slate-50 p-4 rounded-3xl border-2 border-dashed">
-                        <div className="flex justify-between items-center mb-2"><span>Recibido:</span><input type="number" className="w-24 p-2 rounded-xl text-right font-bold" value={pagaCon} onChange={e=>setPagaCon(e.target.value)} /></div>
-                        <div className="flex justify-between font-black text-blue-600"><span>Cambio:</span><span>{fmt(devuelta)}</span></div>
-                    </div>
-                )}
-                <div className="p-4 bg-slate-900 rounded-3xl text-white flex justify-between items-center cursor-pointer" onClick={()=>setEsElectronica(!esElectronica)}><span className="text-xs font-bold">Factura Electrónica</span><div className={`w-8 h-4 rounded-full relative ${esElectronica?'bg-blue-500':'bg-slate-700'}`}><div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-all ${esElectronica?'left-4':'left-1'}`}></div></div></div>
-                {esElectronica && <input className="w-full p-3 bg-slate-100 rounded-xl text-xs" placeholder="Email del cliente" onChange={e=>setCliente({...cliente, email: e.target.value})} />}
+                <div className="text-center"><p className="text-xs font-black text-slate-400">TOTAL</p><h1 className="text-5xl font-black text-blue-600">{fmt(totalVenta)}</h1></div>
+                <div className="flex gap-2"><button onClick={()=>setMetodo('Efectivo')} className={`flex-1 p-3 rounded-2xl font-bold border ${metodo==='Efectivo'?'bg-green-50 border-green-500 text-green-700':'bg-white'}`}>EFECTIVO</button><button onClick={()=>setMetodo('Transferencia')} className={`flex-1 p-3 rounded-2xl font-bold border ${metodo==='Transferencia'?'bg-blue-50 border-blue-300 text-blue-700':'bg-white'}`}>BANCO</button></div>
+                {metodo === 'Efectivo' && <div className="bg-slate-50 p-4 rounded-3xl border-2 border-dashed"><div className="flex justify-between items-center mb-2"><span>Recibido:</span><input type="number" className="w-24 p-2 rounded-xl text-right font-bold" value={pagaCon} onChange={e=>setPagaCon(e.target.value)} /></div><div className="flex justify-between font-black text-blue-600"><span>Cambio:</span><span>{fmt(devuelta)}</span></div></div>}
+                <div className="p-4 bg-slate-900 rounded-3xl text-white flex justify-between items-center cursor-pointer" onClick={()=>setEsElectronica(!esElectronica)}><span className="text-xs font-bold uppercase tracking-widest">Factura Electrónica</span><div className={`w-8 h-4 rounded-full relative ${esElectronica?'bg-blue-500':'bg-slate-700'}`}><div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-all ${esElectronica?'left-4':'left-1'}`}></div></div></div>
             </div>
-            <button onClick={procesar} className="w-full bg-blue-600 text-white font-black py-5 rounded-3xl shadow-xl mt-6">PAGAR TODO</button>
+            <button onClick={procesar} className="w-full bg-blue-600 text-white font-black py-5 rounded-3xl shadow-xl mt-6">PAGAR</button>
         </div>
     </div>
   );
 }
-
 
 function InventarioView({ user }) {
   const [productos, setProductos] = useState([]);
   const [form, setForm] = useState({ nombre: '', sku: '', precio: '', stock: '', min_stock: 5 });
   const load = useCallback(() => axios.get('/productos').then(res => setProductos(res.data)), []);
   useEffect(() => { load(); }, [load]);
-
   const handleImportExcel = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -370,27 +307,27 @@ function InventarioView({ user }) {
       const wb = XLSX.read(bstr, { type: 'binary' });
       const wsname = wb.SheetNames[0];
       const data = XLSX.utils.sheet_to_json(wb.Sheets[wsname]);
-      const productosImportados = data.map(item => ({
-        nombre: item.Nombre || item.nombre, sku: item.SKU || item.sku, precio: item.Precio || item.precio, stock: item.Stock || item.stock, min_stock: item.Minimo || 5
-      }));
-      if (window.confirm(`¿Importar ${productosImportados.length} productos?`)) {
-        try { await axios.post('/productos/importar', { productos: productosImportados, responsable: user.nombre }); window.alert("Completado"); load(); } catch (e) { window.alert("Error"); }
+      const prods = data.map(item => ({ nombre: item.Nombre || item.nombre, sku: item.SKU || item.sku, precio: item.Precio || item.precio, stock: item.Stock || item.stock, min_stock: item.Minimo || 5 }));
+      if (window.confirm(`¿Importar ${prods.length} productos?`)) {
+        try { await axios.post('/productos/importar', { productos: prods, responsable: user.nombre }); window.alert("Éxito"); load(); } catch (e) { window.alert("Error"); }
       }
     };
     reader.readAsBinaryString(file);
   };
-
   return (
     <div className="space-y-10 animate-fade-in">
         <div className="bg-white p-10 rounded-[40px] shadow-sm border border-slate-100">
             <div className="flex justify-between items-center mb-8">
                 <h3 className="font-black text-xl tracking-tighter">Inventario</h3>
-                <label className="bg-slate-900 text-white px-6 py-3 rounded-2xl font-black text-[10px] cursor-pointer hover:bg-black flex items-center gap-2 shadow-xl"><Upload size={14} className="text-blue-400"/> CARGA MASIVA EXCEL<input type="file" accept=".xlsx, .xls, .csv" onChange={handleImportExcel} className="hidden" /></label>
+                <label className="bg-slate-900 text-white px-6 py-3 rounded-2xl font-black text-[10px] cursor-pointer hover:bg-black flex items-center gap-2"><Upload size={14}/> EXCEL<input type="file" accept=".xlsx, .xls, .csv" onChange={handleImportExcel} className="hidden" /></label>
             </div>
-            <form onSubmit={async (e)=>{e.preventDefault(); await axios.post('/productos', {...form, responsable: user.nombre}); load(); setForm({nombre:'',sku:'',precio:'',stock:'',min_stock:5});}} className="grid grid-cols-5 gap-4"><input className="p-4 bg-slate-50 border-none rounded-2xl font-bold" placeholder="Nombre" value={form.nombre} onChange={e=>setForm({...form, nombre: e.target.value})} required/><input className="p-4 bg-slate-50 border-none rounded-2xl font-bold" placeholder="Código" value={form.sku} onChange={e=>setForm({...form, sku: e.target.value})} required/><input className="p-4 bg-slate-50 border-none rounded-2xl font-bold" type="number" placeholder="Precio" value={form.precio} onChange={e=>setForm({...form, precio: e.target.value})} required/><input className="p-4 bg-slate-50 border-none rounded-2xl font-bold" type="number" placeholder="Stock" value={form.stock} onChange={e=>setForm({...form, stock: e.target.value})} required/><button className="bg-blue-600 text-white font-black rounded-2xl p-4 shadow-xl">GUARDAR</button></form>
+            <form onSubmit={async (e)=>{e.preventDefault(); await axios.post('/productos', {...form, responsable: user.nombre}); load(); setForm({nombre:'',sku:'',precio:'',stock:'',min_stock:5});}} className="grid grid-cols-5 gap-4"><input className="p-4 bg-slate-50 border-none rounded-2xl font-bold" placeholder="Nombre" value={form.nombre} onChange={e=>setForm({...form, nombre: e.target.value})} required/><input className="p-4 bg-slate-50 border-none rounded-2xl font-bold" placeholder="SKU" value={form.sku} onChange={e=>setForm({...form, sku: e.target.value})} required/><input className="p-4 bg-slate-50 border-none rounded-2xl font-bold" type="number" placeholder="Precio" value={form.precio} onChange={e=>setForm({...form, precio: e.target.value})} required/><input className="p-4 bg-slate-50 border-none rounded-2xl font-bold" type="number" placeholder="Stock" value={form.stock} onChange={e=>setForm({...form, stock: e.target.value})} required/><button className="bg-blue-600 text-white font-black rounded-2xl">GUARDAR</button></form>
         </div>
         <div className="bg-white rounded-[40px] shadow-sm overflow-hidden border border-slate-100 pr-2">
-            <table className="w-full text-left"><thead className="bg-slate-50/50"><tr className="text-[10px] font-black uppercase text-slate-400 border-b"><th className="p-8">Producto</th><th>Código</th><th>Precio</th><th>Stock</th><th className="p-8 text-center">Estado</th></tr></thead><tbody>{productos.map(p=>(<tr key={p.id} className="border-b hover:bg-slate-50 transition"><td className="p-8 font-black">{p.nombre}</td><td className="font-mono text-slate-400">{p.sku}</td><td className="font-black">{fmt(p.precio)}</td><td className="font-black">{p.stock}</td><td className="p-8 text-center">{p.stock <= p.min_stock ? <span className="bg-red-100 text-red-600 px-4 py-1.5 rounded-full text-[10px] font-black">CRÍTICO</span> : <span className="bg-green-100 text-green-700 px-4 py-1.5 rounded-full text-[10px] font-black">OK</span>}</td></tr>))}</tbody></table>
+            <table className="w-full text-left">
+                <thead className="bg-slate-50/50 text-[10px] font-black uppercase tracking-widest border-b"><tr><th className="p-8">Producto</th><th>SKU</th><th>Precio</th><th>Stock</th><th className="p-8 text-center">Estado</th></tr></thead>
+                <tbody>{productos.map(p=>(<tr key={p.id} className="border-b hover:bg-slate-50 transition"><td className="p-8 font-black text-slate-800">{p.nombre}</td><td className="font-mono text-slate-400">{p.sku}</td><td className="font-black text-slate-700">{fmt(p.precio)}</td><td className="font-black text-slate-800">{p.stock}</td><td className="p-8 text-center">{p.stock <= p.min_stock ? <span className="bg-red-100 text-red-600 px-4 py-1.5 rounded-full text-[10px] font-black">CRÍTICO</span> : <span className="bg-green-100 text-green-700 px-4 py-1.5 rounded-full text-[10px] font-black">OK</span>}</td></tr>))}</tbody>
+            </table>
         </div>
     </div>
   );
@@ -403,52 +340,34 @@ function NominaView({ user }) {
   const [formEmp, setFormEmp] = useState({ nombre: '', email: '', salario: '', eps: '', arl: '', pension: '' });
   const [formLiq, setFormLiq] = useState({ empleado_id: '', dias: 30, extras: 0, tipo_extra: 'Diurna', metodo: 'Transferencia', banco: '', cuenta: '' });
   const [preview, setPreview] = useState(null);
-  const bancosCO = ["Bancolombia", "Nequi", "Daviplata", "Davienda", "Banco de Bogotá", "Lulo Bank", "Nu Bank", "Dale"];
-
   const load = useCallback(() => { axios.get('/empleados').then(res => setEmpleados(res.data)); axios.get('/nomina/historial').then(res => setNominas(res.data)); }, []);
   useEffect(() => { load(); }, [load]);
-
   const calcular = () => {
-    const e = empleados.find(emp => emp.id === parseInt(formLiq.empleado_id));
-    if(!e) return;
-    const SMLV_2026 = 1750905;
-    const AUX_TRANS_2026 = 249095;
-    const S = parseFloat(e.salario);
-    const basico = Math.round((S / 30) * parseFloat(formLiq.dias));
-    const auxilio = (S <= (SMLV_2026 * 2)) ? Math.round((AUX_TRANS_2026 / 30) * parseFloat(formLiq.dias)) : 0;
-    const valorHora = S / 240;
-    let factor = 1.25;
-    if (formLiq.tipo_extra === 'Nocturna') factor = 1.75;
-    if (formLiq.tipo_extra === 'Dominical') factor = 2.00;
-    if (formLiq.tipo_extra === 'Recargo_Nocturno') factor = 0.35;
-    const valorExtras = Math.round((valorHora * factor) * parseFloat(formLiq.extras || 0));
-    const devengado = basico + auxilio + valorExtras;
-    const ibc = basico + valorExtras;
-    const salud = Math.round(ibc * 0.04);
-    const pension = Math.round(ibc * 0.04);
-    const neto = devengado - salud - pension;
-    setPreview({ nombre: e.nombre, basico, auxilio, extras: valorExtras, tipo_extra_label: formLiq.tipo_extra, salud, pension, neto });
+    const e = empleados.find(emp => emp.id === parseInt(formLiq.empleado_id)); if(!e) return;
+    const S = parseFloat(e.salario); const dias = parseFloat(formLiq.dias);
+    const basico = Math.round((S / 30) * dias); const auxilio = (S <= 3501810) ? Math.round((249095 / 30) * dias) : 0;
+    let factor = 1.25; if (formLiq.tipo_extra === 'Nocturna') factor = 1.75; if (formLiq.tipo_extra === 'Dominical') factor = 2.00; if (formLiq.tipo_extra === 'Recargo_Nocturno') factor = 0.35;
+    const extras = Math.round((S / 240 * factor) * parseFloat(formLiq.extras || 0));
+    const dev = basico + auxilio + extras; const ibc = basico + extras; const sal = Math.round(ibc * 0.04); const pen = Math.round(ibc * 0.04);
+    setPreview({ nombre: e.nombre, basico, auxilio, extras, sal, pen, neto: dev - sal - pen });
   };
-
   return (
     <div className="space-y-10 animate-fade-in">
-      <div className="flex gap-4 p-2 bg-white border rounded-3xl w-fit shadow-sm">
-        {['liquidar', 'empleados', 'history'].map(m => <button key={m} onClick={()=>setMode(m)} className={`px-8 py-3 rounded-2xl font-black text-[10px] uppercase transition-all ${mode===m?'bg-blue-600 text-white shadow-xl shadow-blue-100':'text-slate-400'}`}>{m}</button>)}
-      </div>
+      <div className="flex gap-4 p-2 bg-white border rounded-3xl w-fit shadow-sm">{['liquidar', 'empleados', 'history'].map(m => <button key={m} onClick={()=>setMode(m)} className={`px-8 py-3 rounded-2xl font-black text-[10px] uppercase ${mode===m?'bg-blue-600 text-white shadow-xl':'text-slate-400'}`}>{m}</button>)}</div>
       {mode === 'empleados' && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <div className="bg-white p-10 rounded-[40px] shadow-sm border border-slate-100"><h3 className="font-black text-xl mb-8 tracking-tighter">Vinculación</h3><form onSubmit={async (e)=>{e.preventDefault(); await axios.post('/empleados', formEmp); load(); setFormEmp({nombre:'',email:'',salario:'',eps:'',arl:'',pension:''});}} className="space-y-4"><input className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold" placeholder="Nombre" value={formEmp.nombre} onChange={e=>setFormEmp({...formEmp, nombre: e.target.value})} required/><input className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold" type="email" placeholder="Email" value={formEmp.email} onChange={e=>setFormEmp({...formEmp, email: e.target.value})} required/><input className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold" type="number" placeholder="Salario" value={formEmp.salario} onChange={e=>setFormEmp({...formEmp, salario: e.target.value})} required/><div className="grid grid-cols-3 gap-2"><input className="p-3 bg-slate-50 border-none rounded-xl text-[10px] uppercase" placeholder="EPS" value={formEmp.eps} onChange={e=>setFormEmp({...formEmp, eps: e.target.value})}/><input className="p-3 bg-slate-50 border-none rounded-xl text-[10px] uppercase" placeholder="ARL" value={formEmp.arl} onChange={e=>setFormEmp({...formEmp, arl: e.target.value})}/><input className="p-3 bg-slate-50 border-none rounded-xl text-[10px] uppercase" placeholder="F.P" value={formEmp.pension} onChange={e=>setFormEmp({...formEmp, pension: e.target.value})}/></div><button className="w-full bg-blue-600 text-white font-black py-4 rounded-2xl shadow-xl">VINCULAR</button></form></div>
-            <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4 h-fit pr-2">{empleados.map(e=>(<div key={e.id} className="bg-white p-6 rounded-[32px] shadow-sm border border-slate-100 flex items-center gap-6"><div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center font-black text-2xl text-blue-600">{e.nombre.charAt(0)}</div><div className="overflow-hidden"><p className="font-black text-slate-800 text-lg tracking-tighter truncate">{e.nombre}</p><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{e.email}</p><p className="text-xl font-black text-green-600 mt-1">{fmt(e.salario)}</p></div></div>))}</div>
+            <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4 h-fit pr-2">{empleados.map(e=>(<div key={e.id} className="bg-white p-6 rounded-[32px] shadow-sm border border-slate-100 flex items-center gap-6"><div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center font-black text-2xl text-blue-600">{e.nombre.charAt(0)}</div><div className="overflow-hidden"><p className="font-black text-slate-800 text-lg tracking-tighter truncate">{e.nombre}</p><p className="text-xl font-black text-green-600 mt-1">{fmt(e.salario)}</p></div></div>))}</div>
         </div>
       )}
       {mode === 'liquidar' && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-              <div className="bg-white p-12 rounded-[40px] shadow-xl border border-green-100"><h3 className="font-black text-2xl mb-8 text-green-800 tracking-tighter flex items-center gap-3"><Calculator/> LIQUIDADOR</h3><div className="space-y-6"><div><label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-4 block mb-2">Empleado</label><select className="w-full p-5 bg-slate-50 border-none rounded-3xl font-black" onChange={e=>setFormLiq({...formLiq, empleado_id: e.target.value})}><option>-- Seleccionar --</option>{empleados.map(e=><option key={e.id} value={e.id}>{e.nombre}</option>)}</select></div><div className="grid grid-cols-2 gap-6"><div><label className="text-[10px] font-black uppercase text-slate-400 ml-4">Días</label><input type="number" className="w-full p-5 bg-slate-50 border-none rounded-3xl font-black" value={formLiq.dias} onChange={e=>setFormLiq({...formLiq, dias: e.target.value})}/></div><div><label className="text-[10px] font-black uppercase text-slate-400 ml-4">Extras</label><input type="number" className="w-full p-5 bg-slate-50 border-none rounded-3xl font-black" value={formLiq.extras} onChange={e=>setFormLiq({...formLiq, extras: e.target.value})}/></div></div><div><label className="text-[10px] font-black uppercase text-slate-400 ml-4">Recargo</label><select className="w-full p-5 bg-slate-50 border-none rounded-3xl font-black" value={formLiq.tipo_extra} onChange={e=>setFormLiq({...formLiq, tipo_extra: e.target.value})}><option value="Diurna">Diurna</option><option value="Nocturna">Nocturna</option><option value="Dominical">Dominical</option><option value="Recargo_Nocturno">Recargo</option></select></div><div className="flex gap-4"><button onClick={()=>setFormLiq({...formLiq, metodo: 'Efectivo'})} className={`flex-1 p-5 rounded-3xl font-black border-2 transition ${formLiq.metodo==='Efectivo'?'bg-green-50 border-green-500 text-green-700':'bg-white'}`}>EFECTIVO</button><button onClick={()=>setFormLiq({...formLiq, metodo: 'Transferencia'})} className={`flex-1 p-5 rounded-3xl font-black border-2 transition ${formLiq.metodo==='Transferencia'?'bg-blue-50 border-blue-500 text-blue-700':'bg-white'}`}>BANCO</button></div>{formLiq.metodo === 'Transferencia' && (<div className="grid grid-cols-2 gap-4 animate-fade-in"><select className="p-5 bg-slate-50 border-none rounded-3xl font-bold" onChange={e=>setFormLiq({...formLiq, banco: e.target.value})}><option>-- Banco --</option>{bancosCO.map(b=><option key={b}>{b}</option>)}</select><input className="p-5 bg-slate-50 border-none rounded-3xl font-bold" placeholder="Nro Cuenta" onChange={e=>setFormLiq({...formLiq, cuenta: e.target.value})} /></div>)}<button onClick={calcular} className="w-full bg-slate-900 text-white font-black py-5 rounded-3xl shadow-xl hover:bg-black transition-all">CALCULAR</button></div></div>
-              <div className="bg-white p-12 rounded-[40px] shadow-2xl border-l-[12px] border-blue-600 flex flex-col justify-between">{preview ? (<div className="space-y-6 animate-fade-in"><div className="text-center border-b pb-8"><h4 className="text-3xl font-black text-slate-800 tracking-tighter">{preview.nombre}</h4></div><div className="space-y-3 font-bold text-sm text-slate-600"><div className="flex justify-between"><span>Básico:</span><span>{fmt(preview.basico)}</span></div><div className="flex justify-between"><span>Auxilio:</span><span>{fmt(preview.auxilio)}</span></div><div className="flex justify-between"><span>Extras:</span><span>{fmt(preview.extras)}</span></div><div className="flex justify-between text-red-500 border-t pt-4"><span>Deducciones:</span><span>-{fmt(preview.salud + preview.pension)}</span></div></div><div className="bg-blue-600 p-8 rounded-[32px] text-center"><span className="text-5xl font-black text-white tracking-tighter">{fmt(preview.neto)}</span></div><button onClick={async ()=>{if(window.confirm(`¿Confirmar pago?`)){await axios.post('/nomina/liquidar', {...formLiq, extras: formLiq.extras, responsable: user.nombre}); window.alert("Pagado"); load(); setMode('history'); setPreview(null);}}} className="w-full bg-slate-900 text-white font-black py-6 rounded-[32px] shadow-xl hover:scale-[1.02] transition-all">CONFIRMAR Y ENVIAR</button></div>) : <div className="h-full flex items-center justify-center opacity-20"><Mail size={100}/></div>}</div>
+              <div className="bg-white p-12 rounded-[40px] shadow-xl border border-green-100"><h3 className="font-black text-xl mb-8 tracking-tighter flex items-center gap-3"><Calculator/> LIQUIDADOR</h3><div className="space-y-6"><div><label className="text-[10px] font-black uppercase text-slate-400 ml-4 block mb-2">Empleado</label><select className="w-full p-5 bg-slate-50 border-none rounded-3xl font-black" onChange={e=>setFormLiq({...formLiq, empleado_id: e.target.value})}><option>-- Seleccionar --</option>{empleados.map(e=><option key={e.id} value={e.id}>{e.nombre}</option>)}</select></div><div className="grid grid-cols-2 gap-6"><div><label className="text-[10px] font-black uppercase text-slate-400 ml-4">Días</label><input type="number" className="w-full p-5 bg-slate-50 border-none rounded-3xl font-black" value={formLiq.dias} onChange={e=>setFormLiq({...formLiq, dias: e.target.value})}/></div><div><label className="text-[10px] font-black uppercase text-slate-400 ml-4">Extras</label><input type="number" className="w-full p-5 bg-slate-50 border-none rounded-3xl font-black" value={formLiq.extras} onChange={e=>setFormLiq({...formLiq, extras: e.target.value})}/></div></div><div><label className="text-[10px] font-black uppercase text-slate-400 ml-4">Tipo Recargo</label><select className="w-full p-5 bg-slate-50 border-none rounded-3xl font-black" value={formLiq.tipo_extra} onChange={e=>setFormLiq({...formLiq, tipo_extra: e.target.value})}><option value="Diurna">Diurna</option><option value="Nocturna">Nocturna</option><option value="Dominical">Dominical</option><option value="Recargo_Nocturno">Recargo</option></select></div><button onClick={calcular} className="w-full bg-slate-900 text-white font-black py-5 rounded-3xl shadow-xl hover:bg-black transition-all">CALCULAR</button></div></div>
+              <div className="bg-white p-12 rounded-[40px] shadow-2xl border-l-[12px] border-blue-600 flex flex-col justify-between">{preview ? (<div className="space-y-6 animate-fade-in"><div className="text-center border-b pb-8"><h4 className="text-3xl font-black text-slate-800 tracking-tighter">{preview.nombre}</h4></div><div className="bg-blue-600 p-8 rounded-[32px] text-center text-5xl font-black text-white">{fmt(preview.neto)}</div><button onClick={async ()=>{if(window.confirm(`¿Confirmar pago?`)){await axios.post('/nomina/liquidar', {...formLiq, extras: formLiq.extras, responsable: user.nombre}); window.alert("Éxito"); load(); setMode('history'); setPreview(null);}}} className="w-full bg-slate-900 text-white font-black py-6 rounded-[32px] shadow-xl hover:scale-102 transition-all">PAGAR</button></div>) : <div className="h-full flex items-center justify-center opacity-20"><Mail size={100}/></div>}</div>
           </div>
       )}
       {mode === 'history' && (
-          <div className="bg-white rounded-[40px] shadow-sm overflow-hidden border border-slate-100 pr-2"><table className="w-full text-left text-sm"><thead className="bg-slate-50/50"><tr className="text-[10px] font-black uppercase text-slate-400 border-b"><th className="p-8">Fecha</th><th>Empleado</th><th className="p-8 text-right">Neto</th></tr></thead><tbody>{nominas.map(n => (<tr key={n.id} className="border-b hover:bg-slate-50 transition"><td className="p-8 text-xs font-black text-slate-500">{new Date(n.fecha_pago).toLocaleDateString()}</td><td className="font-black text-slate-800 text-lg tracking-tight">{n.nombre_empleado}</td><td className="p-8 font-black text-green-600 text-xl text-right">{fmt(n.neto_pagar)}</td></tr>))}</tbody></table></div>
+          <div className="bg-white rounded-[40px] shadow-sm overflow-hidden border border-slate-100 pr-2"><table className="w-full text-left text-sm"><thead className="bg-slate-50/50 text-[10px] font-black uppercase text-slate-400 border-b"><tr><th className="p-8">Fecha</th><th>Empleado</th><th className="p-8 text-right">Neto</th></tr></thead><tbody>{nominas.map(n => (<tr key={n.id} className="border-b hover:bg-slate-50 transition"><td className="p-8 text-xs font-black text-slate-500">{new Date(n.fecha_pago).toLocaleDateString()}</td><td className="font-black text-slate-800 text-lg tracking-tight">{n.nombre_empleado}</td><td className="p-8 font-black text-green-600 text-xl text-right">{fmt(n.neto_pagar)}</td></tr>))}</tbody></table></div>
       )}
     </div>
   );
@@ -466,17 +385,10 @@ function ContabilidadView() {
         } catch (e) { console.error(e); }
     }, []);
     useEffect(() => { loadData(); }, [loadData]);
-
-    const gruposDiario = diario.reduce((acc, curr) => {
-        if (!acc[curr.comprobante_id]) { acc[curr.comprobante_id] = { id: curr.comprobante_id, fecha: curr.fecha, tipo: curr.tipo_doc, desc: curr.descripcion, asientos: [] }; }
-        acc[curr.comprobante_id].asientos.push(curr); return acc;
-    }, {});
-
+    const gruposDiario = diario.reduce((acc, curr) => { if (!acc[curr.comprobante_id]) { acc[curr.comprobante_id] = { id: curr.comprobante_id, fecha: curr.fecha, tipo: curr.tipo_doc, desc: curr.descripcion, asientos: [] }; } acc[curr.comprobante_id].asientos.push(curr); return acc; }, {});
     const totalActivos = balance.filter(c => c.codigo.startsWith('1')).reduce((a, b) => a + parseFloat(b.saldo), 0);
     const totalPasivos = balance.filter(c => c.codigo.startsWith('2')).reduce((a, b) => a + Math.abs(parseFloat(b.saldo)), 0);
-    const utilidadBruta = balance.filter(c => c.codigo.startsWith('4')).reduce((a, b) => a + Math.abs(parseFloat(b.saldo)), 0) - 
-                          balance.filter(c => c.codigo.startsWith('5') || c.codigo.startsWith('6')).reduce((a, b) => a + parseFloat(b.saldo), 0);
-
+    const utilidadBruta = balance.filter(c => c.codigo.startsWith('4')).reduce((a, b) => a + Math.abs(parseFloat(b.saldo)), 0) - balance.filter(c => c.codigo.startsWith('5') || c.codigo.startsWith('6')).reduce((a, b) => a + parseFloat(b.saldo), 0);
     return (
         <div className="space-y-8 animate-fade-in">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -484,7 +396,7 @@ function ContabilidadView() {
                 <div className="bg-white p-8 rounded-[40px] shadow-sm border-l-[12px] border-l-red-500"><p className="text-[10px] font-black uppercase tracking-[3px] text-slate-400 mb-2">Pasivos</p><h3 className="text-3xl font-black tracking-tighter">{fmt(totalPasivos)}</h3></div>
                 <div className="bg-white p-8 rounded-[40px] shadow-sm border-l-[12px] border-l-blue-600"><p className="text-[10px] font-black uppercase tracking-[3px] text-slate-400 mb-2">Utilidad</p><h3 className="text-3xl font-black tracking-tighter">{fmt(utilidadBruta)}</h3></div>
             </div>
-            <div className="flex gap-4 p-2 bg-white border rounded-3xl w-fit shadow-sm"><button onClick={()=>setSubTab('diario')} className={`px-8 py-3 rounded-2xl font-black text-xs uppercase ${subTab==='diario'?'bg-slate-900 text-white shadow-xl':'text-slate-400'}`}>Diario</button><button onClick={()=>setSubTab('balance')} className={`px-8 py-3 rounded-2xl font-black text-xs uppercase ${subTab==='balance'?'bg-slate-900 text-white shadow-xl':'text-slate-400'}`}>Balance</button></div>
+            <div className="flex gap-4 p-2 bg-white border rounded-3xl w-fit shadow-sm"><button onClick={()=>setSubTab('diario')} className={`px-8 py-3 rounded-2xl font-black text-xs uppercase ${subTab==='diario'?'bg-slate-900 text-white shadow-xl':'text-slate-400 hover:text-slate-800'}`}>Diario</button><button onClick={()=>setSubTab('balance')} className={`px-8 py-3 rounded-2xl font-black text-xs uppercase ${subTab==='balance'?'bg-slate-900 text-white shadow-xl':'text-slate-400 hover:text-slate-800'}`}>Balance</button></div>
             {subTab === 'diario' && (
                 <div className="space-y-6">
                     {Object.values(gruposDiario).map(comp => (
@@ -493,7 +405,7 @@ function ContabilidadView() {
                 </div>
             )}
             {subTab === 'balance' && (
-                <div className="bg-white rounded-[40px] shadow-sm border overflow-hidden animate-slide-up pr-2"><table className="w-full text-left"><thead className="bg-slate-900 text-white"><tr className="text-[10px] font-black uppercase tracking-widest"><th className="p-8">Código</th><th>Cuenta</th><th className="p-8 text-right">Saldo Final</th></tr></thead><tbody>{balance.map((cta, i) => (<tr key={i} className="border-b hover:bg-blue-50 transition group"><td className="p-6 font-black text-blue-600">{cta.codigo}</td><td className="font-bold text-slate-700">{cta.nombre}</td><td className={`p-8 text-right font-black ${cta.saldo < 0 ? 'text-red-500' : 'text-slate-900'}`}>{fmt(Math.abs(cta.saldo))} {cta.saldo < 0 ? '(Cr)' : '(Db)'}</td></tr>))}</tbody></table></div>
+                <div className="bg-white rounded-[40px] shadow-sm border overflow-hidden pr-2 animate-slide-up pr-2"><table className="w-full text-left"><thead className="bg-slate-900 text-white"><tr className="text-[10px] font-black uppercase tracking-widest"><th className="p-8">Código</th><th>Cuenta</th><th className="p-8 text-right">Saldo Final</th></tr></thead><tbody>{balance.map((cta, i) => (<tr key={i} className="border-b hover:bg-blue-50 transition group"><td className="p-6 font-black text-blue-600">{cta.codigo}</td><td className="font-bold text-slate-700">{cta.nombre}</td><td className={`p-8 text-right font-black ${cta.saldo < 0 ? 'text-red-500' : 'text-slate-900'}`}>{fmt(Math.abs(cta.saldo))} {cta.saldo < 0 ? '(Cr)' : '(Db)'}</td></tr>))}</tbody></table></div>
             )}
         </div>
     );
