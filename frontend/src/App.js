@@ -1,20 +1,24 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
-import jsPDF from 'jsPDF';
+import jsPDF from 'jspdf'; // <--- Corregido a minúsculas
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import { 
-  LayoutDashboard, Package, ShoppingCart, Users, DollarSign, 
-  AlertTriangle, Wallet, Lock, Landmark, Mail, Calculator, 
-  ScanBarcode, Upload, X 
-} from 'lucide-react';
-import { BarChart, Bar, XAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+  LayoutDashboard, Package, ShoppingCart, Users, Search, DollarSign, 
+  AlertTriangle, TrendingUp, Edit, X, Wallet, Clock, Lock, CreditCard, 
+  Banknote, Landmark, Upload, Mail, Calculator, DownloadCloud, ScanBarcode, 
+  Plus, ChevronRight
+} from 'lucide-react'; // <--- Añadido 'Upload' aquí
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
 axios.defaults.headers.common['ngrok-skip-browser-warning'] = 'true';
 axios.defaults.baseURL = window.location.origin + '/api';
 
 const fmt = (number) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(number || 0);
 
+// ==========================================
+//    FUNCIÓN GLOBAL: IMPRESIÓN DE FACTURA
+// ==========================================
 const imprimirFactura = (cart, total, responsable, metodo, cliente, recibido, cambio) => {
     try {
         const doc = new jsPDF({ unit: 'mm', format: [80, 150 + (cart.length * 10)] }); 
@@ -42,14 +46,19 @@ const imprimirFactura = (cart, total, responsable, metodo, cliente, recibido, ca
     } catch (e) { console.error(e); }
 };
 
+// ==========================================
+//           COMPONENTE PRINCIPAL
+// ==========================================
 function App() {
   const [user, setUser] = useState(null);
   const [isRegistering, setIsRegistering] = useState(false);
+
   if (!user) {
     return isRegistering ? 
       <RegisterScreen onBack={() => setIsRegistering(false)} /> : 
       <LoginScreen onLogin={setUser} onGoToRegister={() => setIsRegistering(true)} />;
   }
+
   return (
     <div className="font-sans text-slate-600 bg-slate-50 min-h-screen">
       <Dashboard user={user} onLogout={() => setUser(null)} />
@@ -72,12 +81,12 @@ function RegisterScreen({ onBack }) {
             <div className="bg-white p-10 rounded-[40px] shadow-2xl w-full max-w-md">
                 <h2 className="text-3xl font-black mb-2 text-slate-800 tracking-tighter">Nueva Cuenta</h2>
                 <form onSubmit={handleRegister} className="space-y-4">
-                    <input className="w-full p-4 border rounded-2xl bg-slate-50 font-bold" placeholder="Nombre Empresa" onChange={e => setForm({...form, nombre: e.target.value})} required />
-                    <input className="w-full p-4 border rounded-2xl bg-slate-50 font-bold" type="email" placeholder="Email" onChange={e => setForm({...form, email: e.target.value})} required />
-                    <input className="w-full p-4 border rounded-2xl bg-slate-50 font-bold" type="password" placeholder="Contraseña" onChange={e => setForm({...form, password: e.target.value})} required />
-                    <button className="w-full bg-blue-600 text-white font-black py-4 rounded-2xl">REGISTRARME</button>
+                    <input className="w-full p-4 border rounded-2xl bg-slate-50" placeholder="Nombre Empresa" onChange={e => setForm({...form, nombre: e.target.value})} required />
+                    <input className="w-full p-4 border rounded-2xl bg-slate-50" type="email" placeholder="Email" onChange={e => setForm({...form, email: e.target.value})} required />
+                    <input className="w-full p-4 border rounded-2xl bg-slate-50" type="password" placeholder="Contraseña" onChange={e => setForm({...form, password: e.target.value})} required />
+                    <button className="w-full bg-blue-600 text-white font-black py-4 rounded-2xl shadow-xl">REGISTRARME</button>
                 </form>
-                <button onClick={onBack} className="w-full mt-4 text-slate-400 font-bold text-sm">Volver</button>
+                <button onClick={onBack} className="w-full mt-4 text-slate-400 font-bold text-sm">Volver al Login</button>
             </div>
         </div>
     );
@@ -101,7 +110,7 @@ function LoginScreen({ onLogin, onGoToRegister }) {
         <form onSubmit={handle} className="space-y-4">
           <input className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold" value={email} onChange={e => setEmail(e.target.value)} placeholder="Email" />
           <input type="password" className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold" value={password} onChange={e => setPassword(e.target.value)} placeholder="Contraseña" />
-          <button className="w-full bg-slate-900 text-white font-black py-4 rounded-2xl shadow-xl">INGRESAR</button>
+          <button className="w-full bg-slate-900 text-white font-black py-4 rounded-2xl shadow-xl hover:bg-black transition-all">INGRESAR</button>
         </form>
         <button onClick={onGoToRegister} className="w-full mt-8 text-blue-600 font-black text-sm hover:underline">REGISTRAR EMPRESA</button>
       </div>
@@ -260,7 +269,7 @@ function VentasView({ user, turnoActivo }) {
           if(res.data.success) {
               imprimirFactura(cart, totalVenta, user.nombre, metodo, cliente, pagaCon, devuelta);
               setCart([]); setPagaCon(''); setEsElectronica(false);
-              window.alert("Éxito."); load();
+              window.alert("Venta procesada."); load();
           }
       } catch (e) { window.alert("Error."); }
   };
@@ -305,8 +314,7 @@ function InventarioView({ user }) {
     reader.onload = async (evt) => {
       const bstr = evt.target.result;
       const wb = XLSX.read(bstr, { type: 'binary' });
-      const wsname = wb.SheetNames[0];
-      const data = XLSX.utils.sheet_to_json(wb.Sheets[wsname]);
+      const data = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
       const prods = data.map(item => ({ nombre: item.Nombre || item.nombre, sku: item.SKU || item.sku, precio: item.Precio || item.precio, stock: item.Stock || item.stock, min_stock: item.Minimo || 5 }));
       if (window.confirm(`¿Importar ${prods.length} productos?`)) {
         try { await axios.post('/productos/importar', { productos: prods, responsable: user.nombre }); window.alert("Éxito"); load(); } catch (e) { window.alert("Error"); }
@@ -319,7 +327,7 @@ function InventarioView({ user }) {
         <div className="bg-white p-10 rounded-[40px] shadow-sm border border-slate-100">
             <div className="flex justify-between items-center mb-8">
                 <h3 className="font-black text-xl tracking-tighter">Inventario</h3>
-                <label className="bg-slate-900 text-white px-6 py-3 rounded-2xl font-black text-[10px] cursor-pointer hover:bg-black flex items-center gap-2 shadow-xl"><Upload size={14}/> EXCEL<input type="file" accept=".xlsx, .xls, .csv" onChange={handleImportExcel} className="hidden" /></label>
+                <label className="bg-slate-900 text-white px-6 py-3 rounded-2xl font-black text-[10px] cursor-pointer hover:bg-black flex items-center gap-2"><Upload size={14}/> EXCEL<input type="file" accept=".xlsx, .xls, .csv" onChange={handleImportExcel} className="hidden" /></label>
             </div>
             <form onSubmit={async (e)=>{e.preventDefault(); await axios.post('/productos', {...form, responsable: user.nombre}); load(); setForm({nombre:'',sku:'',precio:'',stock:'',min_stock:5});}} className="grid grid-cols-5 gap-4"><input className="p-4 bg-slate-50 border-none rounded-2xl font-bold" placeholder="Nombre" value={form.nombre} onChange={e=>setForm({...form, nombre: e.target.value})} required/><input className="p-4 bg-slate-50 border-none rounded-2xl font-bold" placeholder="SKU" value={form.sku} onChange={e=>setForm({...form, sku: e.target.value})} required/><input className="p-4 bg-slate-50 border-none rounded-2xl font-bold" type="number" placeholder="Precio" value={form.precio} onChange={e=>setForm({...form, precio: e.target.value})} required/><input className="p-4 bg-slate-50 border-none rounded-2xl font-bold" type="number" placeholder="Stock" value={form.stock} onChange={e=>setForm({...form, stock: e.target.value})} required/><button className="bg-blue-600 text-white font-black rounded-2xl">GUARDAR</button></form>
         </div>
@@ -362,7 +370,7 @@ function NominaView({ user }) {
       )}
       {mode === 'liquidar' && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-              <div className="bg-white p-12 rounded-[40px] shadow-xl border border-green-100"><h3 className="font-black text-2xl mb-8 text-green-800 tracking-tighter flex items-center gap-3"><Calculator/> LIQUIDADOR</h3><div className="space-y-6"><div><label className="text-[10px] font-black uppercase text-slate-400 ml-4 block mb-2">Empleado</label><select className="w-full p-5 bg-slate-50 border-none rounded-3xl font-black" onChange={e=>setFormLiq({...formLiq, empleado_id: e.target.value})}><option>-- Seleccionar --</option>{empleados.map(e=><option key={e.id} value={e.id}>{e.nombre}</option>)}</select></div><div className="grid grid-cols-2 gap-6"><div><label className="text-[10px] font-black uppercase text-slate-400 ml-4">Días</label><input type="number" className="w-full p-5 bg-slate-50 border-none rounded-3xl font-black" value={formLiq.dias} onChange={e=>setFormLiq({...formLiq, dias: e.target.value})}/></div><div><label className="text-[10px] font-black uppercase text-slate-400 ml-4">Extras</label><input type="number" className="w-full p-5 bg-slate-50 border-none rounded-3xl font-black" value={formLiq.extras} onChange={e=>setFormLiq({...formLiq, extras: e.target.value})}/></div></div><div><label className="text-[10px] font-black uppercase text-slate-400 ml-4">Tipo Recargo</label><select className="w-full p-5 bg-slate-50 border-none rounded-3xl font-black" value={formLiq.tipo_extra} onChange={e=>setFormLiq({...formLiq, tipo_extra: e.target.value})}><option value="Diurna">Diurna</option><option value="Nocturna">Nocturna</option><option value="Dominical">Dominical</option><option value="Recargo_Nocturno">Recargo</option></select></div><button onClick={calcular} className="w-full bg-slate-900 text-white font-black py-5 rounded-3xl shadow-xl hover:bg-black transition-all">CALCULAR</button></div></div>
+              <div className="bg-white p-12 rounded-[40px] shadow-xl border border-green-100"><h3 className="font-black text-xl mb-8 tracking-tighter flex items-center gap-3"><Calculator/> LIQUIDADOR</h3><div className="space-y-6"><div><label className="text-[10px] font-black uppercase text-slate-400 ml-4 block mb-2">Empleado</label><select className="w-full p-5 bg-slate-50 border-none rounded-3xl font-black" onChange={e=>setFormLiq({...formLiq, empleado_id: e.target.value})}><option>-- Seleccionar --</option>{empleados.map(e=><option key={e.id} value={e.id}>{e.nombre}</option>)}</select></div><div className="grid grid-cols-2 gap-6"><div><label className="text-[10px] font-black uppercase text-slate-400 ml-4">Días</label><input type="number" className="w-full p-5 bg-slate-50 border-none rounded-3xl font-black" value={formLiq.dias} onChange={e=>setFormLiq({...formLiq, dias: e.target.value})}/></div><div><label className="text-[10px] font-black uppercase text-slate-400 ml-4">Extras</label><input type="number" className="w-full p-5 bg-slate-50 border-none rounded-3xl font-black" value={formLiq.extras} onChange={e=>setFormLiq({...formLiq, extras: e.target.value})}/></div></div><div><label className="text-[10px] font-black uppercase text-slate-400 ml-4">Tipo Recargo</label><select className="w-full p-5 bg-slate-50 border-none rounded-3xl font-black" value={formLiq.tipo_extra} onChange={e=>setFormLiq({...formLiq, tipo_extra: e.target.value})}><option value="Diurna">Diurna</option><option value="Nocturna">Nocturna</option><option value="Dominical">Dominical</option><option value="Recargo_Nocturno">Recargo</option></select></div><button onClick={calcular} className="w-full bg-slate-900 text-white font-black py-5 rounded-3xl shadow-xl hover:bg-black transition-all">CALCULAR</button></div></div>
               <div className="bg-white p-12 rounded-[40px] shadow-2xl border-l-[12px] border-blue-600 flex flex-col justify-between">{preview ? (<div className="space-y-6 animate-fade-in"><div className="text-center border-b pb-8"><h4 className="text-3xl font-black text-slate-800 tracking-tighter">{preview.nombre}</h4></div><div className="bg-blue-600 p-8 rounded-[32px] text-center text-5xl font-black text-white">{fmt(preview.neto)}</div><button onClick={async ()=>{if(window.confirm(`¿Confirmar pago?`)){await axios.post('/nomina/liquidar', {...formLiq, extras: formLiq.extras, responsable: user.nombre}); window.alert("Éxito"); load(); setMode('history'); setPreview(null);}}} className="w-full bg-slate-900 text-white font-black py-6 rounded-[32px] shadow-xl hover:scale-102 transition-all">PAGAR</button></div>) : <div className="h-full flex items-center justify-center opacity-20"><Mail size={100}/></div>}</div>
           </div>
       )}
