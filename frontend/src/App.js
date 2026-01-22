@@ -477,4 +477,3 @@ function CardStat({ title, value, icon, color }) {
 }
 
 export default App;
-este es el codigo que tengo, solo cambia el error y ya, vuelvelo a mandarmelo sin cambiar nada mas:
