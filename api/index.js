@@ -13,15 +13,15 @@ const dbConfig = {
     user: process.env.DB_USER,
     password: process.env.DB_PASSWORD, 
     database: process.env.DB_NAME,
-    port: Number(process.env.DB_PORT), // Asegura que sea un número
+    port: Number(process.env.DB_PORT),
     ssl: { 
         rejectUnauthorized: false 
     },
-    // Añadimos esto para compatibilidad con MySQL 8 en la nube
-    connectTimeout: 10000,
-    enableKeepAlive: true,
-    keepAliveInitialDelay: 0
+    connectTimeout: 10000
 };
+
+// --- ESTA ES LA LÍNEA QUE TE FALTABA ---
+const pool = mysql.createPool(dbConfig); 
 
 // 2. CONFIGURACIÓN CORREO
 const transporter = nodemailer.createTransport({
@@ -35,7 +35,7 @@ const transporter = nodemailer.createTransport({
     tls: { rejectUnauthorized: false }
 });
 
-// ================= RUTAS DE LA API (CON PREFIJO /API PARA VERCEL) =================
+// ================= RUTAS DE LA API =================
 
 app.post('/api/register', async (req, res) => {
     try {
@@ -64,14 +64,18 @@ app.get('/api/dashboard-data', async (req, res) => {
 });
 
 app.get('/api/empleados', async (req, res) => {
-    const [rows] = await pool.query("SELECT * FROM empleados");
-    res.json(rows);
+    try {
+        const [rows] = await pool.query("SELECT * FROM empleados");
+        res.json(rows);
+    } catch (e) { res.status(500).send(e.message); }
 });
 
 app.post('/api/empleados', async (req, res) => {
-    const { nombre, documento, cargo, salario, email, eps, arl, pension } = req.body;
-    await pool.query("INSERT INTO empleados (nombre, documento, cargo, salario, email, eps, arl, pension_fund) VALUES (?,?,?,?,?,?,?,?)", [nombre, documento, cargo, salario, email, eps, arl, pension]);
-    res.json({ success: true });
+    try {
+        const { nombre, documento, cargo, salario, email, eps, arl, pension } = req.body;
+        await pool.query("INSERT INTO empleados (nombre, documento, cargo, salario, email, eps, arl, pension_fund) VALUES (?,?,?,?,?,?,?,?)", [nombre, documento, cargo, salario, email, eps, arl, pension]);
+        res.json({ success: true });
+    } catch (e) { res.status(500).send(e.message); }
 });
 
 app.post('/api/nomina/liquidar', async (req, res) => {
@@ -118,13 +122,17 @@ app.post('/api/nomina/liquidar', async (req, res) => {
 });
 
 app.get('/api/contabilidad/diario', async (req, res) => {
-    const sql = `SELECT c.id as comprobante_id, c.fecha, c.tipo as tipo_doc, c.descripcion, a.cuenta_codigo, p.nombre as cuenta_nombre, a.debito, a.credito FROM comprobantes c JOIN asientos a ON c.id = a.comprobante_id JOIN plan_cuentas p ON a.cuenta_codigo = p.codigo ORDER BY c.fecha DESC`;
-    const [rows] = await pool.query(sql); res.json(rows);
+    try {
+        const sql = `SELECT c.id as comprobante_id, c.fecha, c.tipo as tipo_doc, c.descripcion, a.cuenta_codigo, p.nombre as cuenta_nombre, a.debito, a.credito FROM comprobantes c JOIN asientos a ON c.id = a.comprobante_id JOIN plan_cuentas p ON a.cuenta_codigo = p.codigo ORDER BY c.fecha DESC`;
+        const [rows] = await pool.query(sql); res.json(rows);
+    } catch (e) { res.status(500).send(e.message); }
 });
 
 app.get('/api/contabilidad/balance', async (req, res) => {
-    const sql = `SELECT p.codigo, p.nombre, p.tipo, IFNULL(SUM(a.debito), 0) as total_debito, IFNULL(SUM(a.credito), 0) as total_credito, (IFNULL(SUM(a.debito), 0) - IFNULL(SUM(a.credito), 0)) as saldo FROM plan_cuentas p LEFT JOIN asientos a ON p.codigo = a.cuenta_codigo GROUP BY p.codigo HAVING total_debito > 0 OR total_credito > 0 ORDER BY p.codigo ASC`;
-    const [rows] = await pool.query(sql); res.json(rows);
+    try {
+        const sql = `SELECT p.codigo, p.nombre, p.tipo, IFNULL(SUM(a.debito), 0) as total_debito, IFNULL(SUM(a.credito), 0) as total_credito, (IFNULL(SUM(a.debito), 0) - IFNULL(SUM(a.credito), 0)) as saldo FROM plan_cuentas p LEFT JOIN asientos a ON p.codigo = a.cuenta_codigo GROUP BY p.codigo HAVING total_debito > 0 OR total_credito > 0 ORDER BY p.codigo ASC`;
+        const [rows] = await pool.query(sql); res.json(rows);
+    } catch (e) { res.status(500).send(e.message); }
 });
 
 app.post('/api/ventas', async (r, s) => {
@@ -145,7 +153,9 @@ app.post('/api/ventas', async (r, s) => {
     finally { c.release(); }
 });
 
-app.get('/api/productos', async(r,s)=>{const[d]=await pool.query("SELECT * FROM productos");s.json(d)});
+app.get('/api/productos', async(r,s)=>{
+    try { const[d]=await pool.query("SELECT * FROM productos"); s.json(d); } catch (e) { s.status(500).send(e.message); }
+});
 
 app.post('/api/productos/importar', async (r, s) => {
     const c = await pool.getConnection();
@@ -159,11 +169,25 @@ app.post('/api/productos/importar', async (r, s) => {
     finally { c.release(); }
 });
 
-app.get('/api/turnos/activo/:id', async(r,s)=>{const[d]=await pool.query("SELECT * FROM turnos WHERE usuario_id=? AND estado='Abierto'",[r.params.id]);s.json(d[0]||null)});
-app.post('/api/turnos/iniciar', async(r,s)=>{const{usuario_id,nombre_usuario,base_caja}=r.body;await pool.query("INSERT INTO turnos (usuario_id,nombre_usuario,base_caja) VALUES (?,?,?)",[usuario_id,nombre_usuario,base_caja]);s.json({success:true});});
-app.put('/api/turnos/finalizar', async(r,s)=>{const[v]=await pool.query("SELECT IFNULL(SUM(total),0) as total FROM ventas WHERE turno_id=?",[r.body.turno_id]);await pool.query("UPDATE turnos SET fecha_fin=NOW(),estado='Cerrado',total_vendido=? WHERE id=?",[v[0].total,r.body.turno_id]);s.json({success:true});});
-app.get('/api/turnos/historial', async(r,s)=>{const[d]=await pool.query("SELECT * FROM turnos ORDER BY fecha_inicio DESC");s.json(d)});
-app.get('/api/nomina/historial', async(r,s)=>{const[d]=await pool.query("SELECT * FROM nominas ORDER BY fecha_pago DESC");s.json(d)});
+app.get('/api/turnos/activo/:id', async(r,s)=>{
+    try { const[d]=await pool.query("SELECT * FROM turnos WHERE usuario_id=? AND estado='Abierto'",[r.params.id]); s.json(d[0]||null); } catch(e) { s.status(500).send(e.message); }
+});
+
+app.post('/api/turnos/iniciar', async(r,s)=>{
+    try { const{usuario_id,nombre_usuario,base_caja}=r.body; await pool.query("INSERT INTO turnos (usuario_id,nombre_usuario,base_caja) VALUES (?,?,?)",[usuario_id,nombre_usuario,base_caja]); res.json({success:true}); } catch(e) { s.status(500).send(e.message); }
+});
+
+app.put('/api/turnos/finalizar', async(r,s)=>{
+    try { const[v]=await pool.query("SELECT IFNULL(SUM(total),0) as total FROM ventas WHERE turno_id=?",[r.body.turno_id]); await pool.query("UPDATE turnos SET fecha_fin=NOW(),estado='Cerrado',total_vendido=? WHERE id=?",[v[0].total,r.body.turno_id]); s.json({success:true}); } catch(e) { s.status(500).send(e.message); }
+});
+
+app.get('/api/turnos/historial', async(r,s)=>{
+    try { const[d]=await pool.query("SELECT * FROM turnos ORDER BY fecha_inicio DESC"); s.json(d); } catch(e) { s.status(500).send(e.message); }
+});
+
+app.get('/api/nomina/historial', async(r,s)=>{
+    try { const[d]=await pool.query("SELECT * FROM nominas ORDER BY fecha_pago DESC"); s.json(d); } catch(e) { s.status(500).send(e.message); }
+});
 
 // EXPORTAR PARA VERCEL
 module.exports = app;
