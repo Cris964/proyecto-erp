@@ -325,72 +325,74 @@ function VentasView({ user, turnoActivo }) {
   );
 }
 
-// --- VISTA INVENTARIO ---
+// --- VISTA INVENTARIO PRO ---
 function InventarioView({ user }) {
-  const [mode, setMode] = useState('list'); // list, bodegas, detalle
+  const [mode, setMode] = useState('list'); // list, bodegas, detalle, ajuste
   const [productos, setProductos] = useState([]);
   const [bodegas, setBodegas] = useState([]);
   const [selectedProd, setSelectedProd] = useState(null);
-  const [prodHistory, setProdHistory] = useState([]);
-  
-  const [form, setForm] = useState({ nombre: '', sku: '', precio: '', costo: 0, stock: 0, bodega_id: 1, proveedor: '' });
+  const [form, setForm] = useState({ nombre: '', sku: '', precio: '', costo: 0, stock: 0, bodega_id: 1, lote: '', vencimiento: '' });
   const [newBodega, setNewBodega] = useState('');
+  const [ajuste, setAjuste] = useState({ id: '', cantidad: 0 });
 
   const load = useCallback(async () => {
     const resP = await axios.get('/productos');
     const resB = await axios.get('/bodegas');
-    setProductos(resP.data);
-    setBodegas(resB.data);
+    setProductos(Array.isArray(resP.data) ? resP.data : []);
+    setBodegas(Array.isArray(resB.data) ? resB.data : []);
   }, []);
 
   useEffect(() => { load(); }, [load]);
 
-  const verDetalle = async (p) => {
-      setSelectedProd(p);
-      const res = await axios.get(`/turnos/historial`); // Aquí deberías tener una ruta de movimientos por producto
-      setMode('detalle');
+  const handleUpdate = async (e) => {
+      e.preventDefault();
+      await axios.put(`/productos/${selectedProd.id}`, selectedProd);
+      window.alert("Actualizado."); setMode('list'); load();
   };
 
   return (
-    <div className="space-y-8 animate-fade-in">
-        {/* SUB-NAVEGACIÓN */}
-        <div className="flex gap-4 p-2 bg-white border rounded-3xl w-fit shadow-sm">
-            <button onClick={()=>setMode('list')} className={`px-8 py-3 rounded-2xl font-black text-[10px] uppercase transition-all ${mode==='list'?'bg-blue-600 text-white shadow-xl':'text-slate-400'}`}>Inventario Global</button>
-            <button onClick={()=>setMode('bodegas')} className={`px-8 py-3 rounded-2xl font-black text-[10px] uppercase transition-all ${mode==='bodegas'?'bg-blue-600 text-white shadow-xl':'text-slate-400'}`}>Gestionar Bodegas</button>
+    <div className="space-y-10 animate-fade-in">
+        <div className="flex gap-4 p-2 bg-white border rounded-3xl w-fit shadow-sm overflow-x-auto">
+            <button onClick={()=>setMode('list')} className={`px-8 py-3 rounded-2xl font-black text-[10px] uppercase transition-all whitespace-nowrap ${mode==='list'?'bg-blue-600 text-white shadow-xl':'text-slate-400'}`}>Stock y Lotes</button>
+            <button onClick={()=>setMode('bodegas')} className={`px-8 py-3 rounded-2xl font-black text-[10px] uppercase transition-all whitespace-nowrap ${mode==='bodegas'?'bg-blue-600 text-white shadow-xl':'text-slate-400'}`}>Bodegas</button>
+            <button onClick={()=>setMode('ajuste')} className={`px-8 py-3 rounded-2xl font-black text-[10px] uppercase transition-all whitespace-nowrap ${mode==='ajuste'?'bg-blue-600 text-white shadow-xl':'text-slate-400'}`}>Ajustar Stock</button>
         </div>
 
         {mode === 'list' && (
             <div className="space-y-8">
-                <div className="bg-white p-10 rounded-[40px] shadow-sm border border-slate-100">
+                <div className="bg-white p-8 rounded-[40px] shadow-sm border border-slate-100">
                     <h3 className="font-black text-xl mb-8 tracking-tighter uppercase italic">Nuevo Producto</h3>
-                    <form onSubmit={async (e)=>{e.preventDefault(); await axios.post('/productos', form); load();}} className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                    <form onSubmit={async (e)=>{e.preventDefault(); await axios.post('/productos', form); load();}} className="grid grid-cols-1 md:grid-cols-4 gap-4">
                         <input className="p-4 bg-slate-50 border-none rounded-2xl font-bold" placeholder="Nombre" onChange={e=>setForm({...form, nombre:e.target.value})} required/>
                         <input className="p-4 bg-slate-50 border-none rounded-2xl font-bold" placeholder="SKU" onChange={e=>setForm({...form, sku:e.target.value})} required/>
                         <select className="p-4 bg-slate-50 border-none rounded-2xl font-black" onChange={e=>setForm({...form, bodega_id:e.target.value})}>
                             {bodegas.map(b => <option key={b.id} value={b.id}>{b.nombre}</option>)}
                         </select>
-                        <input className="p-4 bg-slate-50 border-none rounded-2xl font-bold" type="number" placeholder="Precio Venta" onChange={e=>setForm({...form, precio:e.target.value})} required/>
-                        <input className="p-4 bg-slate-50 border-none rounded-2xl font-bold" type="number" placeholder="Costo" onChange={e=>setForm({...form, costo:e.target.value})} required/>
+                        <input className="p-4 bg-slate-50 border-none rounded-2xl font-bold" type="number" placeholder="Precio" onChange={e=>setForm({...form, precio:e.target.value})} required/>
                         <button className="bg-blue-600 text-white font-black rounded-2xl shadow-xl">CREAR</button>
                     </form>
                 </div>
+                <div className="bg-white rounded-[40px] shadow-sm border border-slate-100 overflow-hidden"><div className="overflow-x-auto"><table className="w-full text-left min-w-[600px]"><thead className="bg-slate-50/50 text-[10px] font-black uppercase tracking-widest border-b"><tr><th className="p-8">Producto</th><th>Bodega</th><th>Lote</th><th>Stock</th><th></th></tr></thead><tbody>{productos.map(p=>(<tr key={p.id} className="border-b hover:bg-slate-50 transition"><td className="p-8 font-black">{p.nombre}</td><td className="text-blue-600 font-bold">{bodegas.find(b=>b.id === p.bodega_id)?.nombre || 'S/B'}</td><td>{p.lote}</td><td className="font-black">{p.stock}</td><td className="p-8"><button onClick={()=>{setSelectedProd(p); setMode('detalle');}} className="p-3 bg-slate-100 rounded-2xl hover:bg-blue-600 hover:text-white transition-all"><History size={16}/></button></td></tr>))}</tbody></table></div></div>
+            </div>
+        )}
 
-                <div className="bg-white rounded-[40px] shadow-sm overflow-hidden border border-slate-100">
-                    <table className="w-full text-left">
-                        <thead className="bg-slate-50/50 text-[10px] font-black uppercase tracking-widest border-b">
-                            <tr><th className="p-8">Producto</th><th>Bodega</th><th>Costo</th><th>Precio</th><th>Stock</th><th></th></tr>
-                        </thead>
-                        <tbody>{productos.map(p=>(
-                            <tr key={p.id} className="border-b hover:bg-slate-50 transition">
-                                <td className="p-8 font-black text-slate-800">{p.nombre}</td>
-                                <td className="text-blue-600 font-bold">{bodegas.find(b=>b.id === p.bodega_id)?.nombre || 'S/B'}</td>
-                                <td className="text-slate-400">{fmt(p.costo)}</td>
-                                <td className="font-black text-slate-700">{fmt(p.precio)}</td>
-                                <td className={`font-black ${p.stock <= p.min_stock ? 'text-red-500' : 'text-slate-800'}`}>{p.stock}</td>
-                                <td className="p-8"><button onClick={()=>verDetalle(p)} className="p-3 bg-slate-100 rounded-2xl hover:bg-blue-600 hover:text-white transition-all"><RefreshCcw size={16}/></button></td>
-                            </tr>
-                        ))}</tbody>
-                    </table>
+        {mode === 'detalle' && selectedProd && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-slide-up">
+                <div className="bg-slate-900 p-10 rounded-[40px] text-white shadow-2xl h-fit">
+                    <h2 className="text-3xl font-black tracking-tighter mb-8 uppercase italic">{selectedProd.nombre}</h2>
+                    <form onSubmit={handleUpdate} className="space-y-6">
+                        <div><label className="text-[10px] font-black uppercase text-slate-500">Proveedor</label><input className="w-full bg-slate-800 p-4 rounded-2xl border-none mt-1 font-bold" value={selectedProd.proveedor || ''} onChange={e=>setSelectedProd({...selectedProd, proveedor: e.target.value})} /></div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div><label className="text-[10px] font-black uppercase text-slate-500">Costo</label><input type="number" className="w-full bg-slate-800 p-4 rounded-2xl border-none mt-1 font-bold" value={selectedProd.costo || 0} onChange={e=>setSelectedProd({...selectedProd, costo: e.target.value})} /></div>
+                            <div><label className="text-[10px] font-black uppercase text-slate-500">Precio</label><input type="number" className="w-full bg-slate-800 p-4 rounded-2xl border-none mt-1 font-bold" value={selectedProd.precio || 0} onChange={e=>setSelectedProd({...selectedProd, precio: e.target.value})} /></div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div><label className="text-[10px] font-black uppercase text-slate-500">Lote</label><input className="w-full bg-slate-800 p-4 rounded-2xl border-none mt-1 font-bold" value={selectedProd.lote || ''} onChange={e=>setSelectedProd({...selectedProd, lote: e.target.value})} /></div>
+                            <div><label className="text-[10px] font-black uppercase text-slate-500">Bodega</label><select className="w-full bg-slate-800 p-4 rounded-2xl border-none mt-1 font-bold" value={selectedProd.bodega_id} onChange={e=>setSelectedProd({...selectedProd, bodega_id: e.target.value})}>{bodegas.map(b=><option key={b.id} value={b.id}>{b.nombre}</option>)}</select></div>
+                        </div>
+                        <button className="w-full py-5 bg-blue-600 rounded-3xl font-black shadow-xl">GUARDAR CAMBIOS</button>
+                        <button onClick={()=>setMode('list')} className="w-full text-slate-500 font-bold text-xs uppercase tracking-widest">Cancelar</button>
+                    </form>
                 </div>
             </div>
         )}
@@ -398,46 +400,27 @@ function InventarioView({ user }) {
         {mode === 'bodegas' && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
                 <div className="bg-white p-10 rounded-[40px] shadow-sm border border-slate-100 h-fit">
-                    <h3 className="font-black text-xl mb-8 tracking-tighter uppercase italic">Agregar Bodega</h3>
+                    <h3 className="font-black text-xl mb-8 tracking-tighter uppercase italic">Nueva Bodega</h3>
                     <div className="flex gap-4">
-                        <input className="flex-1 p-4 bg-slate-50 border-none rounded-2xl font-bold" placeholder="Nombre de Bodega" value={newBodega} onChange={e=>setNewBodega(e.target.value)} />
-                        <button onClick={async ()=>{await axios.post('/bodegas', {nombre: newBodega}); load(); setNewBodega('');}} className="px-8 bg-blue-600 text-white font-black rounded-2xl">AÑADIR</button>
+                        <input className="flex-1 p-4 bg-slate-50 border-none rounded-2xl font-bold" placeholder="Nombre" value={newBodega} onChange={e=>setNewBodega(e.target.value)} />
+                        <button onClick={async ()=>{await axios.post('/bodegas', {nombre: newBodega}); load(); setNewBodega('');}} className="px-8 bg-blue-600 text-white font-black rounded-2xl shadow-lg">AÑADIR</button>
                     </div>
                 </div>
-                <div className="bg-white rounded-[40px] shadow-sm overflow-hidden border border-slate-100">
-                    <table className="w-full text-left">
-                        <thead className="bg-slate-50/50 text-[10px] font-black uppercase border-b"><tr><th className="p-8">Nombre Bodega</th><th className="p-8 text-right">Acción</th></tr></thead>
-                        <tbody>{bodegas.map(b=>(<tr key={b.id} className="border-b"><td className="p-8 font-black">{b.nombre}</td><td className="p-8 text-right"><button onClick={async ()=>{if(window.confirm("¿Eliminar bodega?")) {await axios.delete(`/bodegas/${b.id}`); load();}}} className="text-red-500 font-bold">Eliminar</button></td></tr>))}</tbody>
-                    </table>
-                </div>
+                <div className="bg-white rounded-[40px] shadow-sm overflow-hidden border border-slate-100"><table className="w-full text-left"><thead className="bg-slate-50/50 text-[10px] font-black uppercase border-b"><tr><th className="p-8">Nombre Bodega</th><th className="p-8 text-right">Acción</th></tr></thead><tbody>{bodegas.map(b=>(<tr key={b.id} className="border-b"><td className="p-8 font-black">{b.nombre}</td><td className="p-8 text-right"><button onClick={async ()=>{if(window.confirm("¿Eliminar?")) {await axios.delete(`/bodegas/${b.id}`); load();}}} className="text-red-500 font-bold">Eliminar</button></td></tr>))}</tbody></table></div>
             </div>
         )}
 
-        {mode === 'detalle' && selectedProd && (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-slide-up">
-                <div className="bg-slate-900 p-10 rounded-[40px] text-white shadow-2xl h-fit">
-                    <h2 className="text-3xl font-black tracking-tighter mb-8">{selectedProd.nombre}</h2>
-                    <div className="space-y-6">
-                        <div><label className="text-[10px] font-black uppercase text-slate-500">Proveedor Actual</label><input className="w-full bg-slate-800 p-3 rounded-xl border-none mt-1" defaultValue={selectedProd.proveedor} /></div>
-                        <div className="grid grid-cols-2 gap-4">
-                            <div><label className="text-[10px] font-black uppercase text-slate-500">Costo Compra</label><input type="number" className="w-full bg-slate-800 p-3 rounded-xl border-none mt-1" defaultValue={selectedProd.costo} /></div>
-                            <div><label className="text-[10px] font-black uppercase text-slate-500">Precio Venta</label><input type="number" className="w-full bg-slate-800 p-3 rounded-xl border-none mt-1" defaultValue={selectedProd.precio} /></div>
-                        </div>
-                        <div>
-                            <label className="text-[10px] font-black uppercase text-slate-500">Origen Fondos (Contabilidad)</label>
-                            <select className="w-full bg-slate-800 p-3 rounded-xl border-none mt-1 font-bold">
-                                <option value="Mayor">Caja Mayor</option>
-                                <option value="Menor">Caja Menor</option>
-                            </select>
-                        </div>
-                        <button className="w-full py-4 bg-blue-600 rounded-2xl font-black shadow-xl">GUARDAR CAMBIOS</button>
-                        <button onClick={()=>setMode('list')} className="w-full text-slate-500 font-bold text-xs">CANCELAR</button>
-                    </div>
-                </div>
-                <div className="lg:col-span-2 bg-white p-10 rounded-[40px] shadow-sm border">
-                    <h3 className="font-black text-2xl mb-6">Kardex del Producto</h3>
-                    <p className="text-slate-400 italic">Aquí aparecerán todos los movimientos de entrada y salida...</p>
-                </div>
+        {mode === 'ajuste' && (
+            <div className="bg-white p-10 rounded-[40px] shadow-sm border border-slate-100 h-fit max-w-xl">
+                <h3 className="font-black text-xl mb-8 tracking-tighter uppercase italic text-green-600">Aumentar Stock</h3>
+                <form onSubmit={async (e)=>{e.preventDefault(); await axios.put('/productos/stock', ajuste); load(); window.alert("Actualizado.");}} className="space-y-4">
+                    <select className="w-full p-4 bg-slate-50 border-none rounded-2xl font-black" onChange={e=>setAjuste({...ajuste, id: e.target.value})}>
+                        <option>-- Seleccionar Producto --</option>
+                        {productos.map(p=><option key={p.id} value={p.id}>{p.nombre} (Actual: {p.stock})</option>)}
+                    </select>
+                    <input className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold" type="number" placeholder="Cantidad a sumar" onChange={e=>setAjuste({...ajuste, cantidad: e.target.value})}/>
+                    <button className="w-full bg-green-600 text-white font-black py-4 rounded-2xl shadow-xl">ACTUALIZAR STOCK</button>
+                </form>
             </div>
         )}
     </div>
@@ -535,34 +518,86 @@ function AdminView() {
 }
 
 function ContabilidadView() {
-    const [subTab, setSubTab] = useState('diario');
-    const [diario, setDiario] = useState([]);
-    const [balance, setBalance] = useState([]);
-    const loadData = useCallback(async () => {
-        try {
-            const [resDiario, resBalance] = await Promise.all([ axios.get('/contabilidad/diario'), axios.get('/contabilidad/balance') ]);
-            setDiario(Array.isArray(resDiario.data) ? resDiario.data : []);
-            setBalance(Array.isArray(resBalance.data) ? resBalance.data : []);
-        } catch (e) { console.error(e); }
-    }, []);
-    useEffect(() => { loadData(); }, [loadData]);
-    const gruposDiario = diario.reduce((acc, curr) => { if (!acc[curr.comprobante_id]) { acc[curr.comprobante_id] = { id: curr.comprobante_id, fecha: curr.fecha, tipo: curr.tipo_doc, desc: curr.descripcion, asientos: [] }; } acc[curr.comprobante_id].asientos.push(curr); return acc; }, {});
-    const totalActivos = balance.filter(c => c.codigo.startsWith('1')).reduce((a, b) => a + parseFloat(b.saldo), 0);
-    const totalPasivos = balance.filter(c => c.codigo.startsWith('2')).reduce((a, b) => a + Math.abs(parseFloat(b.saldo)), 0);
-    const utilidadBruta = balance.filter(c => c.codigo.startsWith('4')).reduce((a, b) => a + Math.abs(parseFloat(b.saldo)), 0) - balance.filter(c => c.codigo.startsWith('5') || c.codigo.startsWith('6')).reduce((a, b) => a + parseFloat(b.saldo), 0);
+    const [subTab, setSubTab] = useState('ventas'); // ventas, nominas, proveedores
+    const [datos, setDatos] = useState([]);
+    const [sort, setSort] = useState('fecha DESC');
+    const [formCompra, setFormCompra] = useState({ proveedor: '', producto: '', cantidad: 0, costo: 0, lote: '', vencimiento: '', estado: 'Pagado', tipo: 'Recompra', origen_dinero: 'Mayor' });
+
+    const load = async () => {
+        const res = await axios.get(`/contabilidad/${subTab}?sort=${sort}`);
+        setDatos(res.data);
+    };
+    useEffect(() => { load(); }, [subTab, sort]);
+
     return (
         <div className="space-y-8 animate-fade-in">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="bg-slate-900 p-8 rounded-[40px] text-white shadow-2xl relative overflow-hidden group"><p className="text-[10px] font-black uppercase tracking-[3px] text-blue-400 mb-2">Activos</p><h3 className="text-3xl font-black tracking-tighter">{fmt(totalActivos)}</h3></div>
-                <div className="bg-white p-8 rounded-[40px] shadow-sm border-l-[12px] border-l-red-500"><p className="text-[10px] font-black uppercase tracking-[3px] text-slate-400 mb-2">Pasivos</p><h3 className="text-3xl font-black tracking-tighter">{fmt(totalPasivos)}</h3></div>
-                <div className="bg-white p-8 rounded-[40px] shadow-sm border-l-[12px] border-l-blue-600"><p className="text-[10px] font-black uppercase tracking-[3px] text-slate-400 mb-2">Utilidad</p><h3 className="text-3xl font-black tracking-tighter">{fmt(utilidadBruta)}</h3></div>
+            {/* Menú de Contaduría */}
+            <div className="flex gap-4 p-2 bg-white border rounded-3xl w-fit shadow-sm overflow-x-auto">
+                <button onClick={()=>setSubTab('ventas')} className={`px-6 py-2 rounded-2xl font-black text-[10px] uppercase ${subTab==='ventas'?'bg-blue-600 text-white':'text-slate-400'}`}>Ventas</button>
+                <button onClick={()=>setSubTab('history')} className={`px-6 py-2 rounded-2xl font-black text-[10px] uppercase ${subTab==='history'?'bg-blue-600 text-white':'text-slate-400'}`}>Nóminas</button>
+                <button onClick={()=>setSubTab('compras')} className={`px-6 py-2 rounded-2xl font-black text-[10px] uppercase ${subTab==='compras'?'bg-blue-600 text-white':'text-slate-400'}`}>Proveedores</button>
             </div>
-            <div className="flex gap-4 p-2 bg-white border rounded-3xl w-fit shadow-sm overflow-x-auto"><button onClick={()=>setSubTab('diario')} className={`px-8 py-3 rounded-2xl font-black text-xs uppercase transition-all whitespace-nowrap ${subTab==='diario'?'bg-slate-900 text-white shadow-xl':'text-slate-400 hover:text-slate-900'}`}>Diario</button><button onClick={()=>setSubTab('balance')} className={`px-8 py-3 rounded-2xl font-black text-xs uppercase transition-all whitespace-nowrap ${subTab==='balance'?'bg-slate-900 text-white shadow-xl':'text-slate-400 hover:text-slate-900'}`}>Balance</button></div>
-            {subTab === 'diario' && (
-                <div className="space-y-6">{Object.values(gruposDiario).map(comp => (<div key={comp.id} className="bg-white rounded-[40px] shadow-sm border overflow-hidden animate-slide-up"><div className="px-8 py-4 bg-slate-50 border-b flex justify-between items-center"><span className="font-black text-slate-800 tracking-tight uppercase text-xs">{comp.tipo} #{comp.id}</span><span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{new Date(comp.fecha).toLocaleDateString()}</span></div><div className="overflow-x-auto"><table className="w-full text-left text-sm min-w-[500px]"><tbody>{comp.asientos.map((as, idx) => (<tr key={idx} className="border-b last:border-none hover:bg-slate-50 transition"><td className="p-4 pl-12 font-bold text-slate-600 text-xs tracking-tight"><span className="text-blue-600 mr-2">{as.cuenta_codigo}</span> {as.cuenta_nombre}</td><td className="text-right font-black text-slate-800">{as.debito > 0 ? fmt(as.debito) : '-'}</td><td className="p-4 pr-12 text-right font-black text-slate-800">{as.credito > 0 ? fmt(as.credito) : '-'}</td></tr>))}</tbody></table></div></div>))}</div>
+
+            {subTab === 'ventas' && (
+                <div className="bg-white p-8 rounded-[40px] shadow-sm border">
+                    <div className="flex justify-between mb-6">
+                        <h3 className="font-black text-xl tracking-tighter">LIBRO DE VENTAS</h3>
+                        <select className="p-2 bg-slate-50 rounded-xl text-xs font-bold" onChange={e=>setSort(e.target.value)}>
+                            <option value="fecha DESC">Más Recientes</option>
+                            <option value="price_desc">Precio Mayor a Menor</option>
+                            <option value="price_asc">Precio Menor a Mayor</option>
+                        </select>
+                    </div>
+                    <table className="w-full text-left">
+                        <thead className="bg-slate-50 text-[10px] uppercase font-black"><tr><th className="p-4">Fecha</th><th>Producto</th><th>Vendedor</th><th className="text-right p-4">Total</th></tr></thead>
+                        <tbody>{datos.map(v=>(<tr key={v.id} className="border-b">
+                            <td className="p-4 text-xs">{new Date(v.fecha).toLocaleDateString()}</td>
+                            <td className="font-bold">{v.nombre_producto}</td>
+                            <td className="text-blue-600 font-bold text-xs">{v.responsable}</td>
+                            <td className="text-right p-4 font-black">{fmt(v.total)}</td>
+                        </tr>))}</tbody>
+                    </table>
+                </div>
             )}
-            {subTab === 'balance' && (
-                <div className="bg-white rounded-[40px] shadow-sm border overflow-hidden pr-2 animate-slide-up pr-2"><div className="overflow-x-auto"><table className="w-full text-left min-w-[500px]"><thead className="bg-slate-900 text-white"><tr className="text-[10px] font-black uppercase tracking-widest"><th className="p-8">Código</th><th>Cuenta</th><th className="p-8 text-right">Saldo Final</th></tr></thead><tbody>{balance.map((cta, i) => (<tr key={i} className="border-b hover:bg-blue-50 transition group"><td className="p-6 font-black text-blue-600">{cta.codigo}</td><td className="font-bold text-slate-700">{cta.nombre}</td><td className={`p-8 text-right font-black ${cta.saldo < 0 ? 'text-red-500' : 'text-slate-900'}`}>{fmt(Math.abs(cta.saldo))} {cta.saldo < 0 ? '(Cr)' : '(Db)'}</td></tr>))}</tbody></table></div></div>
+
+            {subTab === 'compras' && (
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    {/* Formulario de Compra */}
+                    <div className="bg-slate-900 p-8 rounded-[40px] text-white shadow-2xl h-fit">
+                        <h3 className="font-black mb-6 text-blue-400">REGISTRAR COMPRA</h3>
+                        <form onSubmit={async (e)=>{e.preventDefault(); await axios.post('/compras', formCompra); load(); window.alert("Compra registrada y stock actualizado");}} className="space-y-4">
+                            <input className="w-full p-3 bg-slate-800 rounded-xl border-none text-sm" placeholder="Nombre Proveedor" onChange={e=>setFormCompra({...formCompra, proveedor: e.target.value})} required/>
+                            <input className="w-full p-3 bg-slate-800 rounded-xl border-none text-sm" placeholder="Producto" onChange={e=>setFormCompra({...formCompra, producto: e.target.value})} required/>
+                            <div className="grid grid-cols-2 gap-2">
+                                <input className="p-3 bg-slate-800 rounded-xl border-none text-sm" type="number" placeholder="Cant" onChange={e=>setFormCompra({...formCompra, cantidad: e.target.value})} required/>
+                                <input className="p-3 bg-slate-800 rounded-xl border-none text-sm" type="number" placeholder="Costo U." onChange={e=>setFormCompra({...formCompra, costo: e.target.value})} required/>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                                <input className="p-3 bg-slate-800 rounded-xl border-none text-xs" placeholder="Lote" onChange={e=>setFormCompra({...formCompra, lote: e.target.value})}/>
+                                <input className="p-3 bg-slate-800 rounded-xl border-none text-xs" type="date" onChange={e=>setFormCompra({...formCompra, vencimiento: e.target.value})}/>
+                            </div>
+                            <select className="w-full p-3 bg-slate-800 rounded-xl border-none text-sm font-bold" onChange={e=>setFormCompra({...formCompra, estado: e.target.value})}>
+                                <option value="Pagado">Ya Pagado</option><option value="Crédito">A Crédito</option>
+                            </select>
+                            <select className="w-full p-3 bg-slate-800 rounded-xl border-none text-sm font-bold" onChange={e=>setFormCompra({...formCompra, origen_dinero: e.target.value})}>
+                                <option value="Mayor">Caja Mayor (1105)</option><option value="Bancos">Bancos (1110)</option>
+                            </select>
+                            <button className="w-full py-4 bg-blue-600 rounded-2xl font-black">GENERAR FACTURA COMPRA</button>
+                        </form>
+                    </div>
+                    {/* Historial de Compras */}
+                    <div className="lg:col-span-2 bg-white rounded-[40px] shadow-sm border overflow-hidden">
+                        <table className="w-full text-left">
+                            <thead className="bg-slate-50 text-[10px] font-black uppercase"><tr><th className="p-6">Proveedor</th><th>Producto</th><th>Estado</th><th className="text-right p-6">Total</th></tr></thead>
+                            <tbody>{datos.map(c=>(<tr key={c.id} className="border-b">
+                                <td className="p-6 font-black">{c.proveedor_nombre}</td>
+                                <td className="text-sm">{c.producto_nombre}</td>
+                                <td><span className={`px-3 py-1 rounded-full text-[9px] font-black ${c.estado==='Pagado'?'bg-green-100 text-green-700':'bg-orange-100 text-orange-700'}`}>{c.estado}</span></td>
+                                <td className="p-6 text-right font-black">{fmt(c.total)}</td>
+                            </tr>))}</tbody>
+                        </table>
+                    </div>
+                </div>
             )}
         </div>
     );

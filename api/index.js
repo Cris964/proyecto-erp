@@ -166,6 +166,19 @@ app.post('/api/productos/importar', async (req, res) => {
 });
 
 // --- CONTABILIDAD PROFESIONAL ---
+app.get('/api/contabilidad/ventas', async (req, res) => {
+    const { sort } = req.query;
+    let order = "fecha DESC";
+    if(sort === 'price_desc') order = "total DESC";
+    if(sort === 'price_asc') order = "total ASC";
+    const [rows] = await pool.query(`SELECT * FROM ventas ORDER BY ${order}`);
+    res.json(rows);
+});
+
+app.get('/api/contabilidad/compras', async (req, res) => {
+    const [rows] = await pool.query("SELECT * FROM compras ORDER BY fecha DESC");
+    res.json(rows);
+});
 app.get('/api/contabilidad/diario', async (req, res) => {
     try {
         const sql = `SELECT c.id as comprobante_id, c.fecha, c.tipo as tipo_doc, c.descripcion, a.cuenta_codigo, p.nombre as cuenta_nombre, a.debito, a.credito FROM comprobantes c JOIN asientos a ON c.id = a.comprobante_id JOIN plan_cuentas p ON a.cuenta_codigo = p.codigo ORDER BY c.fecha DESC`;
@@ -181,12 +194,13 @@ app.get('/api/contabilidad/balance', async (req, res) => {
 });
 
 // --- CAJA Y TURNOS ---
-app.get('/api/turnos/activo/:id', async(req, res) => {
-    try { 
+app.get('/api/turnos/activo/:id', async (req, res) => {
+    try {
         const [turno] = await pool.query("SELECT * FROM turnos WHERE usuario_id = ? AND estado = 'Abierto'", [req.params.id]);
         if (turno.length > 0) {
-            const [ventas] = await pool.query("SELECT IFNULL(SUM(total), 0) as total FROM ventas WHERE turno_id = ?", [turno[0].id]);
-            res.json({ ...turno[0], total_vendido: ventas[0].total });
+            // Calculamos el total de ventas real de este turno en este instante
+            const [v] = await pool.query("SELECT IFNULL(SUM(total), 0) as total, COUNT(*) as cant FROM ventas WHERE turno_id = ?", [turno[0].id]);
+            res.json({ ...turno[0], total_vendido: v[0].total, cantidad_ventas: v[0].cant });
         } else res.json(null);
     } catch (e) { res.status(500).send(e.message); }
 });
@@ -273,6 +287,38 @@ app.put('/api/productos/:id', async (req, res) => {
         res.json({ success: true });
     } catch (e) { await connection.rollback(); res.status(500).send(e.message); }
     finally { connection.release(); }
+});
+
+// --- PAGO A PROVEEDORES (NUEVO) ---
+app.post('/api/compras', async (req, res) => {
+    const c = await pool.getConnection();
+    try {
+        await c.beginTransaction();
+        const { proveedor, producto, cantidad, costo, lote, vencimiento, estado, tipo, origen_dinero } = req.body;
+        const total = cantidad * costo;
+
+        // 1. Registrar Compra
+        await c.query("INSERT INTO compras (proveedor_nombre, producto_nombre, cantidad, costo_unitario, total, lote, vencimiento, estado, tipo_compra) VALUES (?,?,?,?,?,?,?,?,?)", 
+        [proveedor, producto, cantidad, costo, total, lote, vencimiento, estado, tipo]);
+
+        // 2. Actualizar o Crear Producto en Inventario
+        if(tipo === 'Recompra') {
+            await c.query("UPDATE productos SET stock = stock + ?, costo = ?, lote = ?, vencimiento = ? WHERE nombre = ?", [cantidad, costo, lote, vencimiento, producto]);
+        } else {
+            await c.query("INSERT INTO productos (nombre, sku, precio, stock, costo, lote, vencimiento, proveedor) VALUES (?,?,?,?,?,?,?,?)", [producto, 'TEMP-'+Date.now(), costo * 1.3, cantidad, costo, lote, vencimiento, proveedor]);
+        }
+
+        // 3. Contabilidad (Si se pagó)
+        if(estado === 'Pagado') {
+            const cuentaCaja = origen_dinero === 'Mayor' ? '1105' : '1110';
+            const [comp] = await c.query("INSERT INTO comprobantes (tipo, descripcion, total) VALUES (?,?,?)", ['Egreso Compra', `Pago a ${proveedor} por ${producto}`, total]);
+            await c.query("INSERT INTO asientos (comprobante_id, cuenta_codigo, debito, credito) VALUES (?,?,?,?)", [comp.insertId, '1435', total, 0]);
+            await c.query("INSERT INTO asientos (comprobante_id, cuenta_codigo, debito, credito) VALUES (?,?,?,?)", [comp.insertId, cuentaCaja, 0, total]);
+        }
+
+        await c.commit(); res.json({ success: true });
+    } catch (e) { await c.rollback(); res.status(500).send(e.message); }
+    finally { c.release(); }
 });
 
 module.exports = app;
