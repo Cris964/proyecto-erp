@@ -327,56 +327,117 @@ function VentasView({ user, turnoActivo }) {
 
 // --- VISTA INVENTARIO ---
 function InventarioView({ user }) {
-  const [mode, setMode] = useState('list');
+  const [mode, setMode] = useState('list'); // list, bodegas, detalle
   const [productos, setProductos] = useState([]);
-  const [form, setForm] = useState({ nombre: '', sku: '', precio: '', stock: '', min_stock: 5, lote: '', vencimiento: '' });
-  const [ajuste, setAjuste] = useState({ id: '', cantidad: 0 });
-  const load = useCallback(() => axios.get('/productos').then(res => setProductos(res.data)), []);
+  const [bodegas, setBodegas] = useState([]);
+  const [selectedProd, setSelectedProd] = useState(null);
+  const [prodHistory, setProdHistory] = useState([]);
+  
+  const [form, setForm] = useState({ nombre: '', sku: '', precio: '', costo: 0, stock: 0, bodega_id: 1, proveedor: '' });
+  const [newBodega, setNewBodega] = useState('');
+
+  const load = useCallback(async () => {
+    const resP = await axios.get('/productos');
+    const resB = await axios.get('/bodegas');
+    setProductos(resP.data);
+    setBodegas(resB.data);
+  }, []);
+
   useEffect(() => { load(); }, [load]);
-  const handleImportExcel = (e) => {
-    const file = e.target.files[0]; if (!file) return;
-    const reader = new FileReader();
-    reader.onload = async (evt) => {
-      const bstr = evt.target.result; const wb = XLSX.read(bstr, { type: 'binary' });
-      const data = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
-      const prods = data.map(item => ({ nombre: item.Nombre || item.nombre, sku: item.SKU || item.sku, precio: item.Precio || item.precio, stock: item.Stock || item.stock, min_stock: item.Minimo || 5 }));
-      if (window.confirm(`¿Importar ${prods.length} productos?`)) {
-        try { await axios.post('/api/productos/importar', { productos: prods, responsable: user.nombre }); window.alert("Éxito"); load(); } catch (e) { window.alert("Error"); }
-      }
-    };
-    reader.readAsBinaryString(file);
+
+  const verDetalle = async (p) => {
+      setSelectedProd(p);
+      const res = await axios.get(`/turnos/historial`); // Aquí deberías tener una ruta de movimientos por producto
+      setMode('detalle');
   };
+
   return (
-    <div className="space-y-10 animate-fade-in">
+    <div className="space-y-8 animate-fade-in">
+        {/* SUB-NAVEGACIÓN */}
         <div className="flex gap-4 p-2 bg-white border rounded-3xl w-fit shadow-sm">
-            <button onClick={()=>setMode('list')} className={`px-8 py-3 rounded-2xl font-black text-[10px] uppercase transition-all ${mode==='list'?'bg-blue-600 text-white shadow-xl shadow-blue-100':'text-slate-400'}`}>Stock y Lotes</button>
-            <button onClick={()=>setMode('ajuste')} className={`px-8 py-3 rounded-2xl font-black text-[10px] uppercase transition-all ${mode==='ajuste'?'bg-blue-600 text-white shadow-xl shadow-blue-100':'text-slate-400'}`}>Ajustes</button>
-            <label className="bg-slate-900 text-white px-8 py-3 rounded-2xl font-black text-[10px] uppercase cursor-pointer hover:bg-black flex items-center gap-2 shadow-xl"><Upload size={14}/> EXCEL<input type="file" accept=".xlsx, .xls, .csv" onChange={handleImportExcel} className="hidden" /></label>
+            <button onClick={()=>setMode('list')} className={`px-8 py-3 rounded-2xl font-black text-[10px] uppercase transition-all ${mode==='list'?'bg-blue-600 text-white shadow-xl':'text-slate-400'}`}>Inventario Global</button>
+            <button onClick={()=>setMode('bodegas')} className={`px-8 py-3 rounded-2xl font-black text-[10px] uppercase transition-all ${mode==='bodegas'?'bg-blue-600 text-white shadow-xl':'text-slate-400'}`}>Gestionar Bodegas</button>
         </div>
-        {mode === 'list' ? (
-            <div className="space-y-10">
-                <div className="bg-white p-10 rounded-[40px] shadow-sm border border-slate-100 h-fit">
-                    <h3 className="font-black text-xl mb-8 tracking-tighter uppercase italic">Ingresar Lote</h3>
-                    <form onSubmit={async (e)=>{e.preventDefault(); await axios.post('/productos', form); load();}} className="grid grid-cols-2 md:grid-cols-4 gap-4">
+
+        {mode === 'list' && (
+            <div className="space-y-8">
+                <div className="bg-white p-10 rounded-[40px] shadow-sm border border-slate-100">
+                    <h3 className="font-black text-xl mb-8 tracking-tighter uppercase italic">Nuevo Producto</h3>
+                    <form onSubmit={async (e)=>{e.preventDefault(); await axios.post('/productos', form); load();}} className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
                         <input className="p-4 bg-slate-50 border-none rounded-2xl font-bold" placeholder="Nombre" onChange={e=>setForm({...form, nombre:e.target.value})} required/>
-                        <input className="p-4 bg-slate-50 border-none rounded-2xl font-bold" placeholder="Lote" onChange={e=>setForm({...form, lote:e.target.value})} required/>
-                        <input className="p-4 bg-slate-50 border-none rounded-2xl font-bold text-xs" type="date" onChange={e=>setForm({...form, vencimiento:e.target.value})} required/>
-                        <input className="p-4 bg-slate-50 border-none rounded-2xl font-bold" type="number" placeholder="Precio" onChange={e=>setForm({...form, precio:e.target.value})} required/>
-                        <button className="bg-blue-600 text-white font-black rounded-2xl col-span-2 shadow-xl hover:scale-105">REGISTRAR</button>
+                        <input className="p-4 bg-slate-50 border-none rounded-2xl font-bold" placeholder="SKU" onChange={e=>setForm({...form, sku:e.target.value})} required/>
+                        <select className="p-4 bg-slate-50 border-none rounded-2xl font-black" onChange={e=>setForm({...form, bodega_id:e.target.value})}>
+                            {bodegas.map(b => <option key={b.id} value={b.id}>{b.nombre}</option>)}
+                        </select>
+                        <input className="p-4 bg-slate-50 border-none rounded-2xl font-bold" type="number" placeholder="Precio Venta" onChange={e=>setForm({...form, precio:e.target.value})} required/>
+                        <input className="p-4 bg-slate-50 border-none rounded-2xl font-bold" type="number" placeholder="Costo" onChange={e=>setForm({...form, costo:e.target.value})} required/>
+                        <button className="bg-blue-600 text-white font-black rounded-2xl shadow-xl">CREAR</button>
                     </form>
                 </div>
-                <div className="bg-white rounded-[40px] shadow-sm overflow-hidden border border-slate-100"><div className="overflow-x-auto"><table className="w-full text-left min-w-[600px]"><thead className="bg-slate-50/50 text-[10px] font-black uppercase tracking-widest border-b"><tr><th className="p-8">Producto</th><th>Lote</th><th>Vence</th><th>Precio</th><th>Stock</th></tr></thead><tbody>{productos.map(p=>(<tr key={p.id} className="border-b hover:bg-slate-50 transition"><td className="p-8 font-black text-slate-800">{p.nombre}</td><td className="text-slate-400 font-bold">{p.lote}</td><td className="text-xs">{p.vencimiento ? new Date(p.vencimiento).toLocaleDateString() : 'N/A'}</td><td className="font-black text-slate-700">{fmt(p.precio)}</td><td className="font-black text-slate-800">{p.stock}</td></tr>))}</tbody></table></div></div>
+
+                <div className="bg-white rounded-[40px] shadow-sm overflow-hidden border border-slate-100">
+                    <table className="w-full text-left">
+                        <thead className="bg-slate-50/50 text-[10px] font-black uppercase tracking-widest border-b">
+                            <tr><th className="p-8">Producto</th><th>Bodega</th><th>Costo</th><th>Precio</th><th>Stock</th><th></th></tr>
+                        </thead>
+                        <tbody>{productos.map(p=>(
+                            <tr key={p.id} className="border-b hover:bg-slate-50 transition">
+                                <td className="p-8 font-black text-slate-800">{p.nombre}</td>
+                                <td className="text-blue-600 font-bold">{bodegas.find(b=>b.id === p.bodega_id)?.nombre || 'S/B'}</td>
+                                <td className="text-slate-400">{fmt(p.costo)}</td>
+                                <td className="font-black text-slate-700">{fmt(p.precio)}</td>
+                                <td className={`font-black ${p.stock <= p.min_stock ? 'text-red-500' : 'text-slate-800'}`}>{p.stock}</td>
+                                <td className="p-8"><button onClick={()=>verDetalle(p)} className="p-3 bg-slate-100 rounded-2xl hover:bg-blue-600 hover:text-white transition-all"><RefreshCcw size={16}/></button></td>
+                            </tr>
+                        ))}</tbody>
+                    </table>
+                </div>
             </div>
-        ) : (
-            <div className="bg-white p-10 rounded-[40px] shadow-sm border border-slate-100 h-fit">
-                <h3 className="font-black text-xl mb-8 tracking-tighter uppercase italic">Aumentar Stock</h3>
-                <form onSubmit={async (e)=>{e.preventDefault(); await axios.put('/productos/stock', ajuste); load();}} className="space-y-4 max-w-md">
-                    <select className="w-full p-4 bg-slate-50 border-none rounded-3xl font-black text-slate-700" onChange={e=>setAjuste({...ajuste, id: e.target.value})}>
-                        <option>-- Seleccionar Producto --</option>{productos.map(p=><option key={p.id} value={p.id}>{p.nombre} (Stock: {p.stock})</option>)}
-                    </select>
-                    <input className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold" type="number" placeholder="Cantidad a sumar" onChange={e=>setAjuste({...ajuste, cantidad: e.target.value})}/>
-                    <button className="w-full bg-green-600 text-white font-black py-4 rounded-2xl shadow-xl">ACTUALIZAR</button>
-                </form>
+        )}
+
+        {mode === 'bodegas' && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                <div className="bg-white p-10 rounded-[40px] shadow-sm border border-slate-100 h-fit">
+                    <h3 className="font-black text-xl mb-8 tracking-tighter uppercase italic">Agregar Bodega</h3>
+                    <div className="flex gap-4">
+                        <input className="flex-1 p-4 bg-slate-50 border-none rounded-2xl font-bold" placeholder="Nombre de Bodega" value={newBodega} onChange={e=>setNewBodega(e.target.value)} />
+                        <button onClick={async ()=>{await axios.post('/bodegas', {nombre: newBodega}); load(); setNewBodega('');}} className="px-8 bg-blue-600 text-white font-black rounded-2xl">AÑADIR</button>
+                    </div>
+                </div>
+                <div className="bg-white rounded-[40px] shadow-sm overflow-hidden border border-slate-100">
+                    <table className="w-full text-left">
+                        <thead className="bg-slate-50/50 text-[10px] font-black uppercase border-b"><tr><th className="p-8">Nombre Bodega</th><th className="p-8 text-right">Acción</th></tr></thead>
+                        <tbody>{bodegas.map(b=>(<tr key={b.id} className="border-b"><td className="p-8 font-black">{b.nombre}</td><td className="p-8 text-right"><button onClick={async ()=>{if(window.confirm("¿Eliminar bodega?")) {await axios.delete(`/bodegas/${b.id}`); load();}}} className="text-red-500 font-bold">Eliminar</button></td></tr>))}</tbody>
+                    </table>
+                </div>
+            </div>
+        )}
+
+        {mode === 'detalle' && selectedProd && (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-slide-up">
+                <div className="bg-slate-900 p-10 rounded-[40px] text-white shadow-2xl h-fit">
+                    <h2 className="text-3xl font-black tracking-tighter mb-8">{selectedProd.nombre}</h2>
+                    <div className="space-y-6">
+                        <div><label className="text-[10px] font-black uppercase text-slate-500">Proveedor Actual</label><input className="w-full bg-slate-800 p-3 rounded-xl border-none mt-1" defaultValue={selectedProd.proveedor} /></div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div><label className="text-[10px] font-black uppercase text-slate-500">Costo Compra</label><input type="number" className="w-full bg-slate-800 p-3 rounded-xl border-none mt-1" defaultValue={selectedProd.costo} /></div>
+                            <div><label className="text-[10px] font-black uppercase text-slate-500">Precio Venta</label><input type="number" className="w-full bg-slate-800 p-3 rounded-xl border-none mt-1" defaultValue={selectedProd.precio} /></div>
+                        </div>
+                        <div>
+                            <label className="text-[10px] font-black uppercase text-slate-500">Origen Fondos (Contabilidad)</label>
+                            <select className="w-full bg-slate-800 p-3 rounded-xl border-none mt-1 font-bold">
+                                <option value="Mayor">Caja Mayor</option>
+                                <option value="Menor">Caja Menor</option>
+                            </select>
+                        </div>
+                        <button className="w-full py-4 bg-blue-600 rounded-2xl font-black shadow-xl">GUARDAR CAMBIOS</button>
+                        <button onClick={()=>setMode('list')} className="w-full text-slate-500 font-bold text-xs">CANCELAR</button>
+                    </div>
+                </div>
+                <div className="lg:col-span-2 bg-white p-10 rounded-[40px] shadow-sm border">
+                    <h3 className="font-black text-2xl mb-6">Kardex del Producto</h3>
+                    <p className="text-slate-400 italic">Aquí aparecerán todos los movimientos de entrada y salida...</p>
+                </div>
             </div>
         )}
     </div>

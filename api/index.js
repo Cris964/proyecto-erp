@@ -228,4 +228,51 @@ app.delete('/api/admin/usuarios/:id', async (req, res) => {
     } catch (e) { res.status(500).send(e.message); }
 });
 
+// --- RUTAS DE BODEGAS ---
+app.get('/api/bodegas', async (req, res) => {
+    const [rows] = await pool.query("SELECT * FROM bodegas");
+    res.json(rows);
+});
+
+app.post('/api/bodegas', async (req, res) => {
+    await pool.query("INSERT INTO bodegas (nombre) VALUES (?)", [req.body.nombre]);
+    res.json({ success: true });
+});
+
+app.delete('/api/bodegas/:id', async (req, res) => {
+    await pool.query("DELETE FROM bodegas WHERE id = ?", [req.params.id]);
+    res.json({ success: true });
+});
+
+// --- DETALLE Y ACTUALIZACIÓN DE PRODUCTO ---
+app.put('/api/productos/:id', async (req, res) => {
+    const { nombre, precio, costo, stock, bodega_id, proveedor, origen_dinero } = req.body;
+    const connection = await pool.getConnection();
+    try {
+        await connection.beginTransaction();
+        
+        // 1. Actualizar producto
+        await connection.query(
+            "UPDATE productos SET nombre=?, precio=?, costo=?, stock=?, bodega_id=?, proveedor=? WHERE id=?",
+            [nombre, precio, costo, stock, bodega_id, proveedor, req.params.id]
+        );
+
+        // 2. Si hubo compra (origen_dinero), registrar en contabilidad
+        if (origen_dinero) {
+            const cuentaCaja = origen_dinero === 'Mayor' ? '1105' : '110502'; // Ejemplo caja menor
+            const [comp] = await connection.query("INSERT INTO comprobantes (tipo, descripcion, total) VALUES (?,?,?)", 
+                ['Compra', `Compra de ${nombre} a ${proveedor}`, costo]);
+            
+            await connection.query("INSERT INTO asientos (comprobante_id, cuenta_codigo, debito, credito) VALUES (?,?,?,?)", 
+                [comp.insertId, '1435', costo, 0]); // Inventario
+            await connection.query("INSERT INTO asientos (comprobante_id, cuenta_codigo, debito, credito) VALUES (?,?,?,?)", 
+                [comp.insertId, cuentaCaja, 0, costo]); // Caja
+        }
+
+        await connection.commit();
+        res.json({ success: true });
+    } catch (e) { await connection.rollback(); res.status(500).send(e.message); }
+    finally { connection.release(); }
+});
+
 module.exports = app;
