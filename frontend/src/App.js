@@ -175,7 +175,7 @@ function Dashboard({ user, onLogout }) {
           {activeTab==='inventario' && <InventarioView user={user}/>}
           {activeTab==='nomina' && <NominaView user={user}/>}
           {activeTab==='conta' && <ContabilidadView/>}
-          {activeTab==='admin' && <AdminView/>}
+          {activeTab==='admin' && <AdminView user={user}/>}
         </div>
       </main>
     </div>
@@ -555,35 +555,84 @@ function ContabilidadView() {
     );
 }
 
-// --- VISTA ADMIN ---
-function AdminView() {
+// --- VISTA ADMINISTRACIÓN DE USUARIOS (SaaS) ---
+function AdminView({ user }) {
     const [usuarios, setUsuarios] = useState([]);
     const [form, setForm] = useState({ nombre: '', email: '', password: '', cargo: 'Vendedor' });
-    const load = () => axios.get('/admin/usuarios').then(res => setUsuarios(res.data));
-    useEffect(() => { load(); }, []);
-    const handleDelete = async (id) => { if(window.confirm("¿Eliminar?")) { await axios.delete(`/admin/usuarios/${id}`); load(); } };
+
+    // Cargar solo los usuarios de ESTA empresa
+    const load = useCallback(() => {
+        axios.get(`/admin/usuarios?company_id=${user.company_id}`)
+            .then(res => setUsuarios(Array.isArray(res.data) ? res.data : []));
+    }, [user.company_id]);
+
+    useEffect(() => { load(); }, [load]);
+
+    const handleAdd = async (e) => {
+        e.preventDefault();
+        try {
+            // Enviamos el company_id del admin para que el nuevo usuario pertenezca a la misma empresa
+            await axios.post('/admin/usuarios', { ...form, company_id: user.company_id });
+            setForm({ nombre: '', email: '', password: '', cargo: 'Vendedor' });
+            load();
+            window.alert("Usuario creado exitosamente");
+        } catch (err) { window.alert("Error al crear usuario"); }
+    };
+
+    const handleDelete = async (id) => {
+        if (window.confirm("¿Eliminar este acceso?")) {
+            await axios.delete(`/admin/usuarios/${id}`);
+            load();
+        }
+    };
+
     return (
         <div className="space-y-10 animate-fade-in">
             <div className="bg-white p-10 rounded-[40px] shadow-sm border border-slate-100 h-fit">
-                <h3 className="font-black text-xl mb-6 tracking-tighter uppercase italic">Crear Acceso</h3>
-                <form onSubmit={async (e)=>{e.preventDefault(); await axios.post('/register', form); load(); setForm({nombre:'',email:'',password:'',cargo:'Vendedor'});}} className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                    <input className="p-4 bg-slate-50 border-none rounded-2xl font-bold" placeholder="Nombre" value={form.nombre} onChange={e=>setForm({...form, nombre: e.target.value})} required/>
-                    <input className="p-4 bg-slate-50 border-none rounded-2xl font-bold" placeholder="Email" value={form.email} onChange={e=>setForm({...form, email: e.target.value})} required/>
-                    <input className="p-4 bg-slate-50 border-none rounded-2xl font-bold" type="password" placeholder="Pass" value={form.password} onChange={e=>setForm({...form, password: e.target.value})} required/>
-                    <select className="p-4 bg-slate-50 border-none rounded-2xl font-black text-slate-700" value={form.cargo} onChange={e=>setForm({...form, cargo: e.target.value})}>
-                        <option value="Admin">Admin</option><option value="Vendedor">Vendedor</option><option value="Contador">Contador</option>
+                <h3 className="font-black text-xl mb-6 tracking-tighter uppercase italic">Crear Acceso para Empleado</h3>
+                <form onSubmit={handleAdd} className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                    <input className="p-4 bg-slate-50 border-none rounded-2xl font-bold text-sm" placeholder="Nombre" value={form.nombre} onChange={e=>setForm({...form, nombre: e.target.value})} required/>
+                    <input className="p-4 bg-slate-50 border-none rounded-2xl font-bold text-sm" placeholder="Email" value={form.email} onChange={e=>setForm({...form, email: e.target.value})} required/>
+                    <input className="p-4 bg-slate-50 border-none rounded-2xl font-bold text-sm" type="password" placeholder="Contraseña" value={form.password} onChange={e=>setForm({...form, password: e.target.value})} required/>
+                    <select className="p-4 bg-slate-50 border-none rounded-2xl font-black text-slate-700 text-sm" value={form.cargo} onChange={e=>setForm({...form, cargo: e.target.value})}>
+                        <option value="Vendedor">Vendedor (Solo Ventas)</option>
+                        <option value="Contador">Contador (Solo Contabilidad)</option>
+                        <option value="Admin">Admin (Acceso Total)</option>
                     </select>
                     <button className="bg-blue-600 text-white font-black rounded-2xl shadow-xl uppercase text-[10px] tracking-widest">AGREGAR</button>
                 </form>
             </div>
-            <div className="bg-white rounded-[40px] shadow-sm overflow-hidden border border-slate-100 pr-2">
-                <div className="overflow-x-auto"><table className="w-full text-left min-w-[500px]"><thead className="bg-slate-50/50 text-[10px] font-black uppercase tracking-widest border-b"><tr><th className="p-8">Nombre</th><th>Email</th><th>Rol</th><th className="p-8 text-center">Acción</th></tr></thead>
-                <tbody>{usuarios.map(u => (<tr key={u.id} className="border-b hover:bg-slate-50 transition"><td className="p-8 font-black">{u.nombre}</td><td>{u.email}</td><td><span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-[10px] font-black uppercase">{u.cargo}</span></td><td className="p-8 text-center"><button onClick={()=>handleDelete(u.id)} className="text-red-500 font-bold hover:bg-red-50 p-2 rounded-xl transition-all uppercase text-[10px]">Eliminar</button></td></tr>))}</tbody></table></div>
+
+            <div className="bg-white rounded-[40px] shadow-sm overflow-hidden border border-slate-100">
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left min-w-[600px]">
+                        <thead className="bg-slate-50/50 text-[10px] font-black uppercase tracking-widest border-b">
+                            <tr><th className="p-8">Nombre</th><th>Email</th><th>Rol</th><th className="p-8 text-center">Acción</th></tr>
+                        </thead>
+                        <tbody>
+                            {usuarios.map(u => (
+                                <tr key={u.id} className="border-b hover:bg-slate-50 transition">
+                                    <td className="p-8 font-black text-slate-800">{u.nombre}</td>
+                                    <td className="font-bold text-slate-500">{u.email}</td>
+                                    <td>
+                                        <span className={`px-4 py-1 rounded-full text-[9px] font-black uppercase ${u.cargo === 'Admin' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
+                                            {u.cargo}
+                                        </span>
+                                    </td>
+                                    <td className="p-8 text-center">
+                                        {u.email !== user.email && (
+                                            <button onClick={()=>handleDelete(u.id)} className="text-red-500 font-bold hover:bg-red-50 px-4 py-2 rounded-xl transition-all">Eliminar</button>
+                                        )}
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     );
 }
-
 // --- HELPERS ---
 function MenuButton({ icon, label, active, onClick }) { return <button onClick={onClick} className={`w-full flex items-center px-6 py-5 rounded-[24px] mb-2 transition-all duration-300 ${active ? 'bg-blue-600 text-white shadow-xl shadow-blue-100 -translate-y-1 scale-105' : 'text-slate-400 hover:bg-slate-50 hover:text-slate-800'}`}><span className="mr-4">{icon}</span><span className="text-sm font-black tracking-tight">{label}</span></button>; }
 function CardStat({ title, value, icon, color }) { 
