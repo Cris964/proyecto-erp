@@ -12,15 +12,13 @@ import {
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
-// CONFIGURACIÓN DE RED
+// CONFIGURACIÓN DE RED (Sincronizada con Vercel)
 axios.defaults.headers.common['ngrok-skip-browser-warning'] = 'true';
 axios.defaults.baseURL = window.location.origin + '/api';
 
 const fmt = (number) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(number || 0);
 
-// ==========================================
-//    FUNCIÓN GLOBAL: IMPRESIÓN DE FACTURA
-// ==========================================
+// --- FUNCIÓN IMPRESIÓN DE FACTURA ---
 const imprimirFactura = (cart, total, responsable, metodo, cliente, recibido, cambio) => {
     try {
         const doc = new jsPDF({ unit: 'mm', format: [80, 150 + (cart.length * 10)] }); 
@@ -142,7 +140,7 @@ function Dashboard({ user, onLogout }) {
       </div>
 
       <aside className={`fixed inset-y-0 left-0 z-40 w-72 bg-white border-r transform transition-transform duration-300 ease-in-out px-6 flex flex-col md:relative md:translate-x-0 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-        <div className="h-28 hidden md:flex items-center font-black text-2xl text-slate-800 italic uppercase">ACCUCLOUD <span className="text-blue-600">.</span></div>
+        <div className="h-28 hidden md:flex items-center font-black text-2xl text-slate-800 italic uppercase tracking-tighter">ACCUCLOUD <span className="text-blue-600">.</span></div>
         <nav className="flex-1 space-y-1 overflow-y-auto mt-10 md:mt-0">
           <MenuButton icon={<LayoutDashboard size={20}/>} label="Dashboard" active={activeTab==='dashboard'} onClick={()=>{setActiveTab('dashboard'); setIsMobileMenuOpen(false);}} />
           <MenuButton icon={<ShoppingCart size={20}/>} label="Ventas (TPV)" active={activeTab==='ventas'} onClick={()=>{setActiveTab('ventas'); setIsMobileMenuOpen(false);}} />
@@ -166,15 +164,15 @@ function Dashboard({ user, onLogout }) {
       <main className="flex-1 overflow-auto p-4 md:p-10">
         <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 md:mb-10 gap-4">
             <h2 className="text-3xl md:text-4xl font-black text-slate-800 tracking-tighter capitalize italic">{activeTab}</h2>
-            {turnoActivo ? <div className="w-full md:w-auto px-4 py-2 bg-green-100 text-green-700 rounded-xl text-[10px] font-black flex items-center justify-center gap-2 border border-green-200"><div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div> EN TURNO: {user.nombre.toUpperCase()} | {fmt(turnoActivo.total_vendido)}</div> : <div className="w-full md:w-auto px-4 py-2 bg-red-100 text-red-700 rounded-xl text-[10px] font-black border border-red-200 text-center uppercase tracking-widest">Caja Cerrada</div>}
+            {turnoActivo ? <div className="w-full md:w-auto px-4 py-2 bg-green-100 text-green-700 rounded-xl text-[10px] font-black flex items-center justify-center gap-2 border border-green-200 uppercase tracking-widest"><div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div> EN TURNO: {user.nombre.toUpperCase()} | {fmt(turnoActivo.total_vendido)}</div> : <div className="w-full md:w-auto px-4 py-2 bg-red-100 text-red-700 rounded-xl text-[10px] font-black border border-red-200 text-center uppercase tracking-widest">Caja Cerrada</div>}
         </header>
         <div className="pb-20 md:pb-0">
-          {activeTab==='dashboard' && <ResumenView/>}
+          {activeTab==='dashboard' && <ResumenView user={user}/>}
           {activeTab==='caja' && <CajaView user={user} turnoActivo={turnoActivo} onUpdate={recargarTurno}/>}
           {activeTab==='ventas' && <VentasView user={user} turnoActivo={turnoActivo}/>}
           {activeTab==='inventario' && <InventarioView user={user}/>}
           {activeTab==='nomina' && <NominaView user={user}/>}
-          {activeTab==='conta' && <ContabilidadView/>}
+          {activeTab==='conta' && <ContabilidadView user={user}/>}
           {activeTab==='admin' && <AdminView user={user}/>}
         </div>
       </main>
@@ -183,9 +181,9 @@ function Dashboard({ user, onLogout }) {
 }
 
 // --- VISTA DASHBOARD ---
-function ResumenView() {
+function ResumenView({ user }) {
   const [data, setData] = useState({ cajaMayor: 0, cajaMenor: 0, valorInventario: 0, lowStock: 0, recentSales: [] });
-  useEffect(() => { axios.get('/dashboard-data').then(res => setData(res.data)); }, []);
+  useEffect(() => { axios.get(`/dashboard-data?company_id=${user.company_id}`).then(res => setData(res.data)); }, []);
   const chartData = [{ name: 'L', v: 400 }, { name: 'M', v: 300 }, { name: 'M', v: 600 }, { name: 'J', v: 800 }, { name: 'V', v: 500 }, { name: 'S', v: 900 }, { name: 'D', v: 200 }];
   return (
     <div className="space-y-6 animate-fade-in">
@@ -224,8 +222,8 @@ function ResumenView() {
 function CajaView({ user, turnoActivo, onUpdate }) {
     const [historial, setHistorial] = useState([]);
     const loadHistorial = useCallback(() => {
-        axios.get('/turnos/historial').then(res => setHistorial(Array.isArray(res.data) ? res.data : []));
-    }, []);
+        axios.get(`/turnos/historial?company_id=${user.company_id}`).then(res => setHistorial(Array.isArray(res.data) ? res.data : []));
+    }, [user.company_id]);
     useEffect(() => { loadHistorial(); }, [loadHistorial]);
     return (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-fade-in">
@@ -235,7 +233,7 @@ function CajaView({ user, turnoActivo, onUpdate }) {
                 {turnoActivo && <div className="bg-slate-50 p-6 rounded-3xl mb-8 text-left font-black tracking-tight italic">Ventas Hoy: <span className="text-green-600">{fmt(turnoActivo.total_vendido)}</span></div>}
                 <button onClick={async ()=>{
                     if(turnoActivo){ if(window.confirm("¿Cerrar?")) { await axios.put('/turnos/finalizar', { turno_id: turnoActivo.id }); onUpdate(); loadHistorial(); } }
-                    else { const b = window.prompt("Base?", "0"); if(b) { await axios.post('/turnos/iniciar', { usuario_id: user.id, nombre_usuario: user.nombre, base_caja: b }); onUpdate(); loadHistorial(); } }
+                    else { const b = window.prompt("Base?", "0"); if(b) { await axios.post('/turnos/iniciar', { usuario_id: user.id, nombre_usuario: user.nombre, base_caja: b, company_id: user.company_id }); onUpdate(); loadHistorial(); } }
                 }} className={`w-full py-5 rounded-3xl font-black text-white ${turnoActivo ? 'bg-red-500' : 'bg-blue-600'} transition-all active:scale-95`}>
                     {turnoActivo ? "REALIZAR CIERRE" : "ABRIR NUEVA CAJA"}
                 </button>
@@ -254,7 +252,7 @@ function VentasView({ user, turnoActivo }) {
   const [cart, setCart] = useState([]);
   const [metodo, setMetodo] = useState('Efectivo');
   const [pagaCon, setPagaCon] = useState('');
-  const load = useCallback(() => axios.get('/productos').then(res => setProductos(res.data)), []);
+  const load = useCallback(() => axios.get(`/productos?company_id=${user.company_id}`).then(res => setProductos(res.data)), [user.company_id]);
   useEffect(() => { load(); }, [load]);
   const totalVenta = cart.reduce((sum, p) => sum + (p.precio * p.cantidad), 0);
   const devuelta = (parseFloat(pagaCon) || 0) - totalVenta;
@@ -280,9 +278,9 @@ function VentasView({ user, turnoActivo }) {
   }, [productos, addToCart]);
   const procesar = async () => {
       if(cart.length === 0) return window.alert("Carrito vacío.");
-      if(metodo === 'Efectivo' && (parseFloat(pagaCon) < totalVenta || !pagaCon)) return window.alert("Monto insuficiente.");
+      if(metodo === 'Efectivo' && (parseFloat(pagaCon) < totalVenta || !pagaCon)) return window.alert("Dinero insuficiente.");
       try {
-          const res = await axios.post('/ventas', { productos: cart, responsable: user.nombre, turno_id: turnoActivo.id, metodo_pago: metodo, pago_recibido: pagaCon, cambio: devuelta });
+          const res = await axios.post('/ventas', { productos: cart, responsable: user.nombre, turno_id: turnoActivo.id, metodo_pago: metodo, pago_recibido: pagaCon, cambio: devuelta, company_id: user.company_id });
           if(res.data.success) {
               imprimirFactura(cart, totalVenta, user.nombre, metodo, null, pagaCon, devuelta);
               setCart([]); setPagaCon(''); window.alert("Venta exitosa."); load();
@@ -296,7 +294,7 @@ function VentasView({ user, turnoActivo }) {
             <div className="bg-white p-6 rounded-[30px] shadow-sm border border-blue-50">
               <div className="flex items-center bg-slate-50 p-4 rounded-2xl border focus-within:ring-2 ring-blue-500 transition-all">
                 <ScanBarcode className="text-slate-400 mr-3" />
-                <input autoFocus className="bg-transparent border-none outline-none w-full font-bold" placeholder="Escanear o buscar..." value={searchTerm} onChange={e=>setSearchTerm(e.target.value)} />
+                <input autoFocus className="bg-transparent border-none outline-none w-full font-bold" placeholder="Pasa la pistola..." value={searchTerm} onChange={e=>setSearchTerm(e.target.value)} />
               </div>
               {searchTerm && <div className="absolute bg-white border rounded-2xl shadow-2xl z-50 p-4 w-full md:w-1/2 mt-2 max-h-60 overflow-auto">{productos.filter(p=>p.nombre.toLowerCase().includes(searchTerm.toLowerCase()) || p.sku.includes(searchTerm)).map(p=>(<div key={p.id} onClick={()=>addToCart(p)} className="p-3 border-b cursor-pointer hover:bg-blue-50 font-black text-slate-700 text-sm">{p.nombre}</div>))}</div>}
             </div>
@@ -318,7 +316,7 @@ function VentasView({ user, turnoActivo }) {
 
 // --- VISTA INVENTARIO PRO ---
 function InventarioView({ user }) {
-  const [mode, setMode] = useState('list'); // list, bodegas, detalle, ajuste
+  const [mode, setMode] = useState('list'); 
   const [productos, setProductos] = useState([]);
   const [bodegas, setBodegas] = useState([]);
   const [selectedProd, setSelectedProd] = useState(null);
@@ -327,11 +325,11 @@ function InventarioView({ user }) {
   const [ajuste, setAjuste] = useState({ id: '', cantidad: 0 });
 
   const load = useCallback(async () => {
-    const resP = await axios.get('/productos');
-    const resB = await axios.get('/bodegas');
+    const resP = await axios.get(`/productos?company_id=${user.company_id}`);
+    const resB = await axios.get(`/bodegas?company_id=${user.company_id}`);
     setProductos(Array.isArray(resP.data) ? resP.data : []);
     setBodegas(Array.isArray(resB.data) ? resB.data : []);
-  }, []);
+  }, [user.company_id]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -341,29 +339,42 @@ function InventarioView({ user }) {
       window.alert("Actualizado."); setMode('list'); load();
   };
 
+  const handleImportExcel = (e) => {
+    const file = e.target.files[0]; if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      const bstr = evt.target.result; const wb = XLSX.read(bstr, { type: 'binary' });
+      const data = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
+      const prods = data.map(item => ({ nombre: item.Nombre || item.nombre, sku: item.SKU || item.sku, precio: item.Precio || item.precio, stock: item.Stock || item.stock, min_stock: item.Minimo || 5 }));
+      if (window.confirm(`¿Importar ${prods.length} productos?`)) {
+        try { await axios.post('/productos/importar', { productos: prods, responsable: user.nombre, company_id: user.company_id }); window.alert("Éxito"); load(); } catch (e) { window.alert("Error"); }
+      }
+    };
+    reader.readAsBinaryString(file);
+  };
+
   return (
     <div className="space-y-10 animate-fade-in">
         <div className="flex gap-4 p-2 bg-white border rounded-3xl w-fit shadow-sm overflow-x-auto">
             <button onClick={()=>setMode('list')} className={`px-8 py-3 rounded-2xl font-black text-[10px] uppercase transition-all whitespace-nowrap ${mode==='list'?'bg-blue-600 text-white shadow-xl':'text-slate-400'}`}>Stock y Lotes</button>
             <button onClick={()=>setMode('bodegas')} className={`px-8 py-3 rounded-2xl font-black text-[10px] uppercase transition-all whitespace-nowrap ${mode==='bodegas'?'bg-blue-600 text-white shadow-xl':'text-slate-400'}`}>Bodegas</button>
             <button onClick={()=>setMode('ajuste')} className={`px-8 py-3 rounded-2xl font-black text-[10px] uppercase transition-all whitespace-nowrap ${mode==='ajuste'?'bg-blue-600 text-white shadow-xl':'text-slate-400'}`}>Ajustar Stock</button>
+            <label className="bg-slate-900 text-white px-8 py-3 rounded-2xl font-black text-[10px] uppercase cursor-pointer hover:bg-black flex items-center gap-2"><Upload size={14}/> CARGA EXCEL<input type="file" accept=".xlsx, .xls, .csv" onChange={handleImportExcel} className="hidden" /></label>
         </div>
 
         {mode === 'list' && (
             <div className="space-y-8">
-                <div className="bg-white p-8 rounded-[40px] shadow-sm border border-slate-100">
-                    <h3 className="font-black text-xl mb-8 tracking-tighter uppercase italic">Nuevo Producto</h3>
-                    <form onSubmit={async (e)=>{e.preventDefault(); await axios.post('/productos', form); load();}} className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="bg-white p-8 rounded-[40px] shadow-sm border border-slate-100 h-fit">
+                    <h3 className="font-black text-xl mb-8 tracking-tighter uppercase italic text-slate-800">Ingresar Lote</h3>
+                    <form onSubmit={async (e)=>{e.preventDefault(); await axios.post('/productos', {...form, company_id: user.company_id}); load();}} className="grid grid-cols-2 md:grid-cols-4 gap-4">
                         <input className="p-4 bg-slate-50 border-none rounded-2xl font-bold" placeholder="Nombre" onChange={e=>setForm({...form, nombre:e.target.value})} required/>
-                        <input className="p-4 bg-slate-50 border-none rounded-2xl font-bold" placeholder="SKU" onChange={e=>setForm({...form, sku:e.target.value})} required/>
-                        <select className="p-4 bg-slate-50 border-none rounded-2xl font-black" onChange={e=>setForm({...form, bodega_id:e.target.value})}>
-                            {bodegas.map(b => <option key={b.id} value={b.id}>{b.nombre}</option>)}
-                        </select>
+                        <input className="p-4 bg-slate-50 border-none rounded-2xl font-bold" placeholder="Lote" onChange={e=>setForm({...form, lote:e.target.value})} required/>
+                        <input className="p-4 bg-slate-50 border-none rounded-2xl font-bold text-xs" type="date" onChange={e=>setForm({...form, vencimiento:e.target.value})} required/>
                         <input className="p-4 bg-slate-50 border-none rounded-2xl font-bold" type="number" placeholder="Precio" onChange={e=>setForm({...form, precio:e.target.value})} required/>
-                        <button className="bg-blue-600 text-white font-black rounded-2xl shadow-xl">CREAR</button>
+                        <button className="bg-blue-600 text-white font-black rounded-2xl col-span-2 shadow-xl hover:scale-105">REGISTRAR</button>
                     </form>
                 </div>
-                <div className="bg-white rounded-[40px] shadow-sm border border-slate-100 overflow-hidden"><div className="overflow-x-auto"><table className="w-full text-left min-w-[600px]"><thead className="bg-slate-50/50 text-[10px] font-black uppercase tracking-widest border-b"><tr><th className="p-8">Producto</th><th>Bodega</th><th>Lote</th><th>Stock</th><th></th></tr></thead><tbody>{productos.map(p=>(<tr key={p.id} className="border-b hover:bg-slate-50 transition"><td className="p-8 font-black">{p.nombre}</td><td className="text-blue-600 font-bold">{bodegas.find(b=>b.id === p.bodega_id)?.nombre || 'S/B'}</td><td>{p.lote}</td><td className="font-black">{p.stock}</td><td className="p-8"><button onClick={()=>{setSelectedProd(p); setMode('detalle');}} className="p-3 bg-slate-100 rounded-2xl hover:bg-blue-600 hover:text-white transition-all"><History size={16}/></button></td></tr>))}</tbody></table></div></div>
+                <div className="bg-white rounded-[40px] shadow-sm border border-slate-100 overflow-hidden"><div className="overflow-x-auto"><table className="w-full text-left min-w-[600px]"><thead className="bg-slate-50/50 text-[10px] font-black uppercase tracking-widest border-b"><tr><th className="p-8">Producto</th><th>Bodega</th><th>Lote</th><th>Stock</th><th></th></tr></thead><tbody>{productos.map(p=>(<tr key={p.id} className="border-b hover:bg-slate-50 transition"><td className="p-8 font-black text-slate-800">{p.nombre}</td><td className="text-blue-600 font-bold">{bodegas.find(b=>b.id === p.bodega_id)?.nombre || 'S/B'}</td><td>{p.lote}</td><td className="font-black">{p.stock}</td><td className="p-8"><button onClick={()=>{setSelectedProd(p); setMode('detalle');}} className="p-3 bg-slate-100 rounded-2xl hover:bg-blue-600 hover:text-white transition-all"><History size={16}/></button></td></tr>))}</tbody></table></div></div>
             </div>
         )}
 
@@ -376,10 +387,6 @@ function InventarioView({ user }) {
                         <div className="grid grid-cols-2 gap-4">
                             <div><label className="text-[10px] font-black uppercase text-slate-500">Costo</label><input type="number" className="w-full bg-slate-800 p-4 rounded-2xl border-none mt-1 font-bold" value={selectedProd.costo || 0} onChange={e=>setSelectedProd({...selectedProd, costo: e.target.value})} /></div>
                             <div><label className="text-[10px] font-black uppercase text-slate-500">Precio</label><input type="number" className="w-full bg-slate-800 p-4 rounded-2xl border-none mt-1 font-bold" value={selectedProd.precio || 0} onChange={e=>setSelectedProd({...selectedProd, precio: e.target.value})} /></div>
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                            <div><label className="text-[10px] font-black uppercase text-slate-500">Lote</label><input className="w-full bg-slate-800 p-4 rounded-2xl border-none mt-1 font-bold" value={selectedProd.lote || ''} onChange={e=>setSelectedProd({...selectedProd, lote: e.target.value})} /></div>
-                            <div><label className="text-[10px] font-black uppercase text-slate-500">Bodega</label><select className="w-full bg-slate-800 p-4 rounded-2xl border-none mt-1 font-bold" value={selectedProd.bodega_id} onChange={e=>setSelectedProd({...selectedProd, bodega_id: e.target.value})}>{bodegas.map(b=><option key={b.id} value={b.id}>{b.nombre}</option>)}</select></div>
                         </div>
                         <button className="w-full py-5 bg-blue-600 rounded-3xl font-black shadow-xl">GUARDAR CAMBIOS</button>
                         <button onClick={()=>setMode('list')} className="w-full text-slate-500 font-bold text-xs uppercase tracking-widest">Cancelar</button>
@@ -394,7 +401,7 @@ function InventarioView({ user }) {
                     <h3 className="font-black text-xl mb-8 tracking-tighter uppercase italic">Nueva Bodega</h3>
                     <div className="flex gap-4">
                         <input className="flex-1 p-4 bg-slate-50 border-none rounded-2xl font-bold" placeholder="Nombre" value={newBodega} onChange={e=>setNewBodega(e.target.value)} />
-                        <button onClick={async ()=>{await axios.post('/bodegas', {nombre: newBodega}); load(); setNewBodega('');}} className="px-8 bg-blue-600 text-white font-black rounded-2xl shadow-lg">AÑADIR</button>
+                        <button onClick={async ()=>{await axios.post('/bodegas', {nombre: newBodega, company_id: user.company_id}); load(); setNewBodega('');}} className="px-8 bg-blue-600 text-white font-black rounded-2xl shadow-lg">AÑADIR</button>
                     </div>
                 </div>
                 <div className="bg-white rounded-[40px] shadow-sm overflow-hidden border border-slate-100"><table className="w-full text-left"><thead className="bg-slate-50/50 text-[10px] font-black uppercase border-b"><tr><th className="p-8">Nombre Bodega</th><th className="p-8 text-right">Acción</th></tr></thead><tbody>{bodegas.map(b=>(<tr key={b.id} className="border-b"><td className="p-8 font-black">{b.nombre}</td><td className="p-8 text-right"><button onClick={async ()=>{if(window.confirm("¿Eliminar?")) {await axios.delete(`/bodegas/${b.id}`); load();}}} className="text-red-500 font-bold">Eliminar</button></td></tr>))}</tbody></table></div>
@@ -405,9 +412,8 @@ function InventarioView({ user }) {
             <div className="bg-white p-10 rounded-[40px] shadow-sm border border-slate-100 h-fit max-w-xl">
                 <h3 className="font-black text-xl mb-8 tracking-tighter uppercase italic text-green-600">Aumentar Stock</h3>
                 <form onSubmit={async (e)=>{e.preventDefault(); await axios.put('/productos/stock', ajuste); load(); window.alert("Actualizado.");}} className="space-y-4">
-                    <select className="w-full p-4 bg-slate-50 border-none rounded-2xl font-black" onChange={e=>setAjuste({...ajuste, id: e.target.value})}>
-                        <option>-- Seleccionar Producto --</option>
-                        {productos.map(p=><option key={p.id} value={p.id}>{p.nombre} (Actual: {p.stock})</option>)}
+                    <select className="w-full p-4 bg-slate-50 border-none rounded-3xl font-black text-slate-700" onChange={e=>setAjuste({...ajuste, id: e.target.value})}>
+                        <option>-- Seleccionar Producto --</option>{productos.map(p=><option key={p.id} value={p.id}>{p.nombre} (Stock: {p.stock})</option>)}
                     </select>
                     <input className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold" type="number" placeholder="Cantidad a sumar" onChange={e=>setAjuste({...ajuste, cantidad: e.target.value})}/>
                     <button className="w-full bg-green-600 text-white font-black py-4 rounded-2xl shadow-xl">ACTUALIZAR STOCK</button>
@@ -429,7 +435,10 @@ function NominaView({ user }) {
   const [formLiq, setFormLiq] = useState({ empleado_id: '', dias: 30, extras: 0, tipo_extra: 'Diurna', metodo: 'Transferencia', banco: '', cuenta: '' });
   const [preview, setPreview] = useState(null);
 
-  const load = useCallback(() => { axios.get('/empleados').then(res => setEmpleados(res.data)); axios.get('/nomina/historial').then(res => setNominas(res.data)); }, []);
+  const load = useCallback(() => { 
+    axios.get(`/empleados?company_id=${user.company_id}`).then(res => setEmpleados(Array.isArray(res.data) ? res.data : [])); 
+    axios.get(`/nomina/historial?company_id=${user.company_id}`).then(res => setNominas(Array.isArray(res.data) ? res.data : [])); 
+  }, [user.company_id]);
   useEffect(() => { load(); }, [load]);
 
   const verPerfil = async (emp) => {
@@ -456,13 +465,13 @@ function NominaView({ user }) {
       </div>
       {mode === 'liquidar' && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-              <div className="bg-white p-12 rounded-[40px] shadow-xl border border-green-100"><h3 className="font-black text-2xl mb-8 text-green-800 tracking-tighter italic"><Calculator/> LIQUIDADOR</h3><div className="space-y-6"><div><select className="w-full p-5 bg-slate-50 border-none rounded-3xl font-black text-slate-700" onChange={e=>setFormLiq({...formLiq, empleado_id: e.target.value})}><option>-- Empleado --</option>{empleados.map(e=><option key={e.id} value={e.id}>{e.nombre}</option>)}</select></div><div className="grid grid-cols-2 gap-6"><div><label className="text-[10px] font-black uppercase text-slate-400 ml-4">Días</label><input type="number" className="w-full p-5 bg-slate-50 border-none rounded-3xl font-black" value={formLiq.dias} onChange={e=>setFormLiq({...formLiq, dias: e.target.value})}/></div><div><label className="text-[10px] font-black uppercase text-slate-400 ml-4">Extras</label><input type="number" className="w-full p-5 bg-slate-50 border-none rounded-3xl font-black" value={formLiq.extras} onChange={e=>setFormLiq({...formLiq, extras: e.target.value})}/></div></div><div><select className="w-full p-5 bg-slate-50 border-none rounded-3xl font-black text-slate-700" value={formLiq.tipo_extra} onChange={e=>setFormLiq({...formLiq, tipo_extra: e.target.value})}><option value="Diurna">Diurna</option><option value="Nocturna">Nocturna</option><option value="Dominical">Dominical</option><option value="Recargo_Nocturno">Recargo</option></select></div><button onClick={calcular} className="w-full bg-slate-900 text-white font-black py-5 rounded-3xl shadow-xl hover:bg-black transition-all">CALCULAR</button></div></div>
-              <div className="bg-white p-12 rounded-[40px] shadow-2xl border-l-[12px] border-blue-600 flex flex-col justify-between">{preview ? (<div className="space-y-6 animate-fade-in"><div className="text-center border-b pb-8"><h4 className="text-3xl font-black text-slate-800 tracking-tighter">{preview.nombre}</h4></div><div className="bg-blue-600 p-8 rounded-[32px] text-center text-5xl font-black text-white">{fmt(preview.neto)}</div><button onClick={async ()=>{if(window.confirm(`¿Confirmar pago?`)){await axios.post('/nomina/liquidar', {...formLiq, extras: formLiq.extras, responsable: user.nombre}); window.alert("Éxito"); load(); setMode('history'); setPreview(null);}}} className="w-full bg-slate-900 text-white font-black py-6 rounded-[32px] shadow-xl hover:scale-102 transition-all">PAGAR</button></div>) : <div className="h-full flex items-center justify-center opacity-20 flex-col"><Mail size={100}/><p className="font-black mt-4 uppercase tracking-widest">Listo</p></div>}</div>
+              <div className="bg-white p-12 rounded-[40px] shadow-xl border border-green-100"><h3 className="font-black text-2xl mb-8 text-green-800 tracking-tighter italic"><Calculator/> LIQUIDADOR</h3><div className="space-y-6"><div><select className="w-full p-5 bg-slate-50 border-none rounded-3xl font-black text-slate-700" onChange={e=>setFormLiq({...formLiq, empleado_id: e.target.value})}><option>-- Seleccionar --</option>{empleados.map(e=><option key={e.id} value={e.id}>{e.nombre}</option>)}</select></div><div className="grid grid-cols-2 gap-6"><div><label className="text-[10px] font-black uppercase text-slate-400 ml-4">Días</label><input type="number" className="w-full p-5 bg-slate-50 border-none rounded-3xl font-black" value={formLiq.dias} onChange={e=>setFormLiq({...formLiq, dias: e.target.value})}/></div><div><label className="text-[10px] font-black uppercase text-slate-400 ml-4">Extras</label><input type="number" className="w-full p-5 bg-slate-50 border-none rounded-3xl font-black" value={formLiq.extras} onChange={e=>setFormLiq({...formLiq, extras: e.target.value})}/></div></div><div><select className="w-full p-5 bg-slate-50 border-none rounded-3xl font-black text-slate-700" value={formLiq.tipo_extra} onChange={e=>setFormLiq({...formLiq, tipo_extra: e.target.value})}><option value="Diurna">Diurna</option><option value="Nocturna">Nocturna</option><option value="Dominical">Dominical</option><option value="Recargo_Nocturno">Recargo</option></select></div><button onClick={calcular} className="w-full bg-slate-900 text-white font-black py-5 rounded-3xl shadow-xl hover:bg-black transition-all">CALCULAR</button></div></div>
+              <div className="bg-white p-12 rounded-[40px] shadow-2xl border-l-[12px] border-blue-600 flex flex-col justify-between">{preview ? (<div className="space-y-6 animate-fade-in"><div className="text-center border-b pb-8"><h4 className="text-3xl font-black text-slate-800 tracking-tighter">{preview.nombre}</h4></div><div className="bg-blue-600 p-8 rounded-[32px] text-center text-5xl font-black text-white shadow-xl">{fmt(preview.neto)}</div><button onClick={async ()=>{if(window.confirm(`¿Confirmar pago?`)){await axios.post('/api/nomina/liquidar', {...formLiq, extras: formLiq.extras, responsable: user.nombre, company_id: user.company_id}); window.alert("Éxito"); load(); setMode('history'); setPreview(null);}}} className="w-full bg-slate-900 text-white font-black py-6 rounded-[32px] shadow-xl hover:scale-102 transition-all">PAGAR</button></div>) : <div className="h-full flex items-center justify-center opacity-20 flex-col"><Mail size={100}/><p className="font-black mt-4 uppercase tracking-widest">Listo</p></div>}</div>
           </div>
       )}
       {mode === 'empleados' && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div className="bg-white p-10 rounded-[40px] shadow-sm border border-slate-100 h-fit"><h3 className="font-black text-xl mb-8 tracking-tighter text-slate-800 uppercase italic">Vincular</h3><form onSubmit={async (e)=>{e.preventDefault(); await axios.post('/api/empleados', formEmp); load(); setFormEmp({nombre:'',email:'',salario:'',eps:'',arl:'',pension:''});}} className="space-y-4"><input className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold" placeholder="Nombre" value={formEmp.nombre} onChange={e=>setFormEmp({...formEmp, nombre: e.target.value})} required/><input className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold" type="email" placeholder="Email" value={formEmp.email} onChange={e=>setFormEmp({...formEmp, email: e.target.value})} required/><input className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold" type="number" placeholder="Salario" value={formEmp.salario} onChange={e=>setFormEmp({...formEmp, salario: e.target.value})} required/><div className="grid grid-cols-3 gap-2"><input className="p-3 bg-slate-50 border-none rounded-xl text-[10px] uppercase font-black" placeholder="EPS" value={formEmp.eps} onChange={e=>setFormEmp({...formEmp, eps: e.target.value})}/><input className="p-3 bg-slate-50 border-none rounded-xl text-[10px] uppercase font-black" placeholder="ARL" value={formEmp.arl} onChange={e=>setFormEmp({...formEmp, arl: e.target.value})}/><input className="p-3 bg-slate-50 border-none rounded-xl text-[10px] uppercase font-black" placeholder="F.P" value={formEmp.pension} onChange={e=>setFormEmp({...formEmp, pension: e.target.value})}/></div><button className="w-full bg-blue-600 text-white font-black py-4 rounded-2xl shadow-xl">VINCULAR</button></form></div>
+            <div className="bg-white p-10 rounded-[40px] shadow-sm border border-slate-100 h-fit"><h3 className="font-black text-xl mb-8 tracking-tighter text-slate-800 uppercase italic">Vincular</h3><form onSubmit={async (e)=>{e.preventDefault(); await axios.post('/api/empleados', {...formEmp, company_id: user.company_id}); load(); setFormEmp({nombre:'',email:'',salario:'',eps:'',arl:'',pension:''});}} className="space-y-4"><input className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold" placeholder="Nombre" value={formEmp.nombre} onChange={e=>setFormEmp({...formEmp, nombre: e.target.value})} required/><input className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold" type="email" placeholder="Email" value={formEmp.email} onChange={e=>setFormEmp({...formEmp, email: e.target.value})} required/><input className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold" type="number" placeholder="Salario" value={formEmp.salario} onChange={e=>setFormEmp({...formEmp, salario: e.target.value})} required/><div className="grid grid-cols-3 gap-2"><input className="p-3 bg-slate-50 border-none rounded-xl text-[10px] uppercase font-black" placeholder="EPS" value={formEmp.eps} onChange={e=>setFormEmp({...formEmp, eps: e.target.value})}/><input className="p-3 bg-slate-50 border-none rounded-xl text-[10px] uppercase font-black" placeholder="ARL" value={formEmp.arl} onChange={e=>setFormEmp({...formEmp, arl: e.target.value})}/><input className="p-3 bg-slate-50 border-none rounded-xl text-[10px] uppercase font-black" placeholder="F.P" value={formEmp.pension} onChange={e=>setFormEmp({...formEmp, pension: e.target.value})}/></div><button className="w-full bg-blue-600 text-white font-black py-4 rounded-2xl shadow-xl">VINCULAR</button></form></div>
             <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4 h-fit pr-2">{empleados.map(e=>(<div key={e.id} onClick={()=>verPerfil(e)} className="bg-white p-6 rounded-[32px] shadow-sm border border-slate-100 flex items-center gap-6 hover:scale-[1.02] transition-all cursor-pointer group"><div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center font-black text-2xl text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-all">{e.nombre.charAt(0)}</div><div className="overflow-hidden"><p className="font-black text-slate-800 text-lg tracking-tighter truncate">{e.nombre}</p><p className="text-xl font-black text-green-600 mt-1">{fmt(e.salario)}</p></div></div>))}</div>
         </div>
       )}
@@ -493,14 +502,14 @@ function NominaView({ user }) {
 }
 
 // --- VISTA CONTABILIDAD ---
-function ContabilidadView() {
-    const [subTab, setSubTab] = useState('ventas'); // ventas, compras
+function ContabilidadView({ user }) {
+    const [subTab, setSubTab] = useState('ventas'); // ventas, compras, balance
     const [datos, setDatos] = useState([]);
     const [sort, setSort] = useState('fecha DESC');
     const [formCompra, setFormCompra] = useState({ proveedor: '', producto: '', cantidad: 0, costo: 0, lote: '', vencimiento: '', estado: 'Pagado', tipo: 'Recompra', origen_dinero: 'Mayor' });
 
     const load = async () => {
-        const res = await axios.get(`/contabilidad/${subTab}?sort=${sort}`);
+        const res = await axios.get(`/contabilidad/${subTab}?sort=${sort}&company_id=${user.company_id}`);
         setDatos(Array.isArray(res.data) ? res.data : []);
     };
     useEffect(() => { load(); }, [subTab, sort]);
@@ -508,9 +517,9 @@ function ContabilidadView() {
     return (
         <div className="space-y-8 animate-fade-in">
             <div className="flex gap-4 p-2 bg-white border rounded-3xl w-fit shadow-sm overflow-x-auto">
-                <button onClick={()=>setSubTab('ventas')} className={`px-8 py-3 rounded-2xl font-black text-[10px] uppercase transition-all ${subTab==='ventas'?'bg-blue-600 text-white shadow-xl':'text-slate-400'}`}>Libro Ventas</button>
-                <button onClick={()=>setSubTab('compras')} className={`px-8 py-3 rounded-2xl font-black text-[10px] uppercase transition-all ${subTab==='compras'?'bg-blue-600 text-white shadow-xl':'text-slate-400'}`}>Proveedores</button>
-                <button onClick={()=>setSubTab('balance')} className={`px-8 py-3 rounded-2xl font-black text-[10px] uppercase transition-all ${subTab==='balance'?'bg-blue-600 text-white shadow-xl':'text-slate-400'}`}>Balance General</button>
+                <button onClick={()=>setSubTab('ventas')} className={`px-8 py-3 rounded-2xl font-black text-[10px] uppercase transition-all whitespace-nowrap ${subTab==='ventas'?'bg-blue-600 text-white shadow-xl':'text-slate-400'}`}>Libro Ventas</button>
+                <button onClick={()=>setSubTab('compras')} className={`px-8 py-3 rounded-2xl font-black text-[10px] uppercase transition-all whitespace-nowrap ${subTab==='compras'?'bg-blue-600 text-white shadow-xl':'text-slate-400'}`}>Proveedores</button>
+                <button onClick={()=>setSubTab('balance')} className={`px-8 py-3 rounded-2xl font-black text-[10px] uppercase transition-all whitespace-nowrap ${subTab==='balance'?'bg-blue-600 text-white shadow-xl':'text-slate-400'}`}>Balance General</button>
             </div>
 
             {subTab === 'ventas' && (
@@ -531,20 +540,13 @@ function ContabilidadView() {
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                     <div className="bg-slate-900 p-8 rounded-[40px] text-white shadow-2xl h-fit">
                         <h3 className="font-black mb-6 text-blue-400 uppercase italic tracking-tighter">Registrar Compra</h3>
-                        <form onSubmit={async (e)=>{e.preventDefault(); await axios.post('/compras', formCompra); load(); window.alert("Compra registrada.");}} className="space-y-4">
+                        <form onSubmit={async (e)=>{e.preventDefault(); await axios.post('/compras', {...formCompra, company_id: user.company_id}); load(); window.alert("Compra registrada.");}} className="space-y-4">
                             <input className="w-full p-4 bg-slate-800 rounded-2xl border-none font-bold text-sm" placeholder="Proveedor" onChange={e=>setFormCompra({...formCompra, proveedor: e.target.value})} required/>
                             <input className="w-full p-4 bg-slate-800 rounded-2xl border-none font-bold text-sm" placeholder="Producto" onChange={e=>setFormCompra({...formCompra, producto: e.target.value})} required/>
                             <div className="grid grid-cols-2 gap-2">
                                 <input className="p-4 bg-slate-800 rounded-2xl border-none font-bold text-sm" type="number" placeholder="Cant" onChange={e=>setFormCompra({...formCompra, cantidad: e.target.value})} required/>
                                 <input className="p-4 bg-slate-800 rounded-2xl border-none font-bold text-sm" type="number" placeholder="Costo" onChange={e=>setFormCompra({...formCompra, costo: e.target.value})} required/>
                             </div>
-                            <div className="grid grid-cols-2 gap-2">
-                                <input className="p-4 bg-slate-800 rounded-2xl border-none font-bold text-xs" placeholder="Lote" onChange={e=>setFormCompra({...formCompra, lote: e.target.value})}/>
-                                <input className="p-4 bg-slate-800 rounded-2xl border-none font-bold text-xs" type="date" onChange={e=>setFormCompra({...formCompra, vencimiento: e.target.value})}/>
-                            </div>
-                            <select className="w-full p-4 bg-slate-800 rounded-2xl border-none font-black text-xs" onChange={e=>setFormCompra({...formCompra, estado: e.target.value})}>
-                                <option value="Pagado">Contado (Pagado)</option><option value="Crédito">Crédito (Por Pagar)</option>
-                            </select>
                             <button className="w-full py-5 bg-blue-600 rounded-3xl font-black shadow-xl hover:brightness-110 transition-all uppercase tracking-widest text-[10px]">Generar Factura Compra</button>
                         </form>
                     </div>
@@ -555,84 +557,35 @@ function ContabilidadView() {
     );
 }
 
-// --- VISTA ADMINISTRACIÓN DE USUARIOS (SaaS) ---
+// --- VISTA ADMIN ---
 function AdminView({ user }) {
     const [usuarios, setUsuarios] = useState([]);
     const [form, setForm] = useState({ nombre: '', email: '', password: '', cargo: 'Vendedor' });
-
-    // Cargar solo los usuarios de ESTA empresa
-    const load = useCallback(() => {
-        axios.get(`/admin/usuarios?company_id=${user.company_id}`)
-            .then(res => setUsuarios(Array.isArray(res.data) ? res.data : []));
-    }, [user.company_id]);
-
-    useEffect(() => { load(); }, [load]);
-
-    const handleAdd = async (e) => {
-        e.preventDefault();
-        try {
-            // Enviamos el company_id del admin para que el nuevo usuario pertenezca a la misma empresa
-            await axios.post('/admin/usuarios', { ...form, company_id: user.company_id });
-            setForm({ nombre: '', email: '', password: '', cargo: 'Vendedor' });
-            load();
-            window.alert("Usuario creado exitosamente");
-        } catch (err) { window.alert("Error al crear usuario"); }
-    };
-
-    const handleDelete = async (id) => {
-        if (window.confirm("¿Eliminar este acceso?")) {
-            await axios.delete(`/admin/usuarios/${id}`);
-            load();
-        }
-    };
-
+    const load = () => axios.get(`/admin/usuarios?company_id=${user.company_id}`).then(res => setUsuarios(res.data));
+    useEffect(() => { load(); }, []);
+    const handleDelete = async (id) => { if(window.confirm("¿Eliminar?")) { await axios.delete(`/admin/usuarios/${id}`); load(); } };
     return (
         <div className="space-y-10 animate-fade-in">
             <div className="bg-white p-10 rounded-[40px] shadow-sm border border-slate-100 h-fit">
-                <h3 className="font-black text-xl mb-6 tracking-tighter uppercase italic">Crear Acceso para Empleado</h3>
-                <form onSubmit={handleAdd} className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                <h3 className="font-black text-xl mb-6 tracking-tighter uppercase italic">Crear Acceso</h3>
+                <form onSubmit={async (e)=>{e.preventDefault(); await axios.post('/admin/usuarios', {...form, company_id: user.company_id}); load(); setForm({nombre:'',email:'',password:'',cargo:'Vendedor'});}} className="grid grid-cols-1 md:grid-cols-5 gap-4">
                     <input className="p-4 bg-slate-50 border-none rounded-2xl font-bold text-sm" placeholder="Nombre" value={form.nombre} onChange={e=>setForm({...form, nombre: e.target.value})} required/>
                     <input className="p-4 bg-slate-50 border-none rounded-2xl font-bold text-sm" placeholder="Email" value={form.email} onChange={e=>setForm({...form, email: e.target.value})} required/>
-                    <input className="p-4 bg-slate-50 border-none rounded-2xl font-bold text-sm" type="password" placeholder="Contraseña" value={form.password} onChange={e=>setForm({...form, password: e.target.value})} required/>
+                    <input className="p-4 bg-slate-50 border-none rounded-2xl font-bold text-sm" type="password" placeholder="Pass" value={form.password} onChange={e=>setForm({...form, password: e.target.value})} required/>
                     <select className="p-4 bg-slate-50 border-none rounded-2xl font-black text-slate-700 text-sm" value={form.cargo} onChange={e=>setForm({...form, cargo: e.target.value})}>
-                        <option value="Vendedor">Vendedor (Solo Ventas)</option>
-                        <option value="Contador">Contador (Solo Contabilidad)</option>
-                        <option value="Admin">Admin (Acceso Total)</option>
+                        <option value="Admin">Admin</option><option value="Vendedor">Vendedor</option><option value="Contador">Contador</option>
                     </select>
                     <button className="bg-blue-600 text-white font-black rounded-2xl shadow-xl uppercase text-[10px] tracking-widest">AGREGAR</button>
                 </form>
             </div>
-
-            <div className="bg-white rounded-[40px] shadow-sm overflow-hidden border border-slate-100">
-                <div className="overflow-x-auto">
-                    <table className="w-full text-left min-w-[600px]">
-                        <thead className="bg-slate-50/50 text-[10px] font-black uppercase tracking-widest border-b">
-                            <tr><th className="p-8">Nombre</th><th>Email</th><th>Rol</th><th className="p-8 text-center">Acción</th></tr>
-                        </thead>
-                        <tbody>
-                            {usuarios.map(u => (
-                                <tr key={u.id} className="border-b hover:bg-slate-50 transition">
-                                    <td className="p-8 font-black text-slate-800">{u.nombre}</td>
-                                    <td className="font-bold text-slate-500">{u.email}</td>
-                                    <td>
-                                        <span className={`px-4 py-1 rounded-full text-[9px] font-black uppercase ${u.cargo === 'Admin' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
-                                            {u.cargo}
-                                        </span>
-                                    </td>
-                                    <td className="p-8 text-center">
-                                        {u.email !== user.email && (
-                                            <button onClick={()=>handleDelete(u.id)} className="text-red-500 font-bold hover:bg-red-50 px-4 py-2 rounded-xl transition-all">Eliminar</button>
-                                        )}
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
+            <div className="bg-white rounded-[40px] shadow-sm overflow-hidden border border-slate-100 pr-2">
+                <div className="overflow-x-auto"><table className="w-full text-left min-w-[500px]"><thead className="bg-slate-50/50 text-[10px] font-black uppercase tracking-widest border-b"><tr><th className="p-8">Nombre</th><th>Email</th><th>Rol</th><th className="p-8 text-center">Acción</th></tr></thead>
+                <tbody>{usuarios.map(u => (<tr key={u.id} className="border-b hover:bg-slate-50 transition"><td className="p-8 font-black">{u.nombre}</td><td>{u.email}</td><td><span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-[10px] font-black uppercase">{u.cargo}</span></td><td className="p-8 text-center"><button onClick={()=>handleDelete(u.id)} className="text-red-500 font-bold hover:bg-red-50 p-2 rounded-xl transition-all uppercase text-[10px]">Eliminar</button></td></tr>))}</tbody></table></div>
             </div>
         </div>
     );
 }
+
 // --- HELPERS ---
 function MenuButton({ icon, label, active, onClick }) { return <button onClick={onClick} className={`w-full flex items-center px-6 py-5 rounded-[24px] mb-2 transition-all duration-300 ${active ? 'bg-blue-600 text-white shadow-xl shadow-blue-100 -translate-y-1 scale-105' : 'text-slate-400 hover:bg-slate-50 hover:text-slate-800'}`}><span className="mr-4">{icon}</span><span className="text-sm font-black tracking-tight">{label}</span></button>; }
 function CardStat({ title, value, icon, color }) { 
@@ -640,7 +593,7 @@ function CardStat({ title, value, icon, color }) {
     return <div className="bg-white p-6 md:p-8 rounded-[30px] md:rounded-[40px] shadow-sm border border-slate-100 hover:shadow-xl transition-shadow duration-300">
         <div className={`w-10 h-10 md:w-12 md:h-12 rounded-2xl flex items-center justify-center mb-4 ${c[color]}`}>{icon}</div>
         <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1 text-xs">{title}</p>
-        <h3 className="text-sm md:text-2xl font-black text-slate-800 mt-1 tracking-tighter leading-none">{value}</h3>
+        <h3 className="text-sm md:text-2xl font-black text-slate-800 truncate">{value}</h3>
     </div>; 
 }
 
