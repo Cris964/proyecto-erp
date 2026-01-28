@@ -7,27 +7,53 @@ import * as XLSX from 'xlsx';
 import { 
   LayoutDashboard, Package, ShoppingCart, Users, DollarSign, 
   AlertTriangle, Wallet, Lock, Mail, Calculator, 
-  ScanBarcode, Upload, X, ShieldCheck, ChevronDown, UserCircle, RefreshCcw, Menu, TrendingUp, Factory, Truck, CreditCard, Settings, ChevronRight
+  ScanBarcode, Upload, X, ShieldCheck, ChevronDown, UserCircle, RefreshCcw, Menu, TrendingUp, Landmark, Warehouse, Truck, History, Settings, ChevronRight, CreditCard
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
-// CONFIGURACIÓN DE RED
+// CONFIGURACIÓN DE RED (Sincronizada con Vercel)
 axios.defaults.headers.common['ngrok-skip-browser-warning'] = 'true';
 axios.defaults.baseURL = window.location.origin + '/api';
 
 const fmt = (number) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(number || 0);
 
+// --- FUNCIÓN IMPRESIÓN DE FACTURA ---
+const imprimirFactura = (cart, total, responsable, metodo, cliente, recibido, cambio) => {
+    try {
+        const doc = new jsPDF({ unit: 'mm', format: [80, 150 + (cart.length * 10)] }); 
+        const ancho = 80;
+        doc.setFontSize(14); doc.text("ACCUCLOUD ERP", ancho/2, 10, {align: 'center'});
+        doc.setFontSize(8);
+        doc.text(`Fecha: ${new Date().toLocaleString()}`, 5, 20);
+        doc.text(`Cajero: ${responsable}`, 5, 24);
+        doc.text(`Cliente: ${cliente?.nombre || 'General'}`, 5, 28);
+        autoTable(doc, {
+            startY: 35, margin: { left: 2, right: 2 },
+            head: [['Cant', 'Producto', 'Subt']],
+            body: cart.map(p => [p.cantidad, p.nombre.substring(0,12), fmt(p.precio * p.cantidad)]),
+            theme: 'plain', styles: { fontSize: 7 }
+        });
+        const finalY = doc.lastAutoTable.finalY + 5;
+        doc.setFontSize(10);
+        doc.text(`TOTAL: ${fmt(total)}`, ancho - 5, finalY, { align: 'right' });
+        doc.setFontSize(7);
+        doc.text(`Recibido: ${fmt(recibido || total)}`, 5, finalY + 5);
+        doc.text(`Cambio: ${fmt(cambio || 0)}`, 5, finalY + 9);
+        window.open(doc.output('bloburl'), '_blank');
+    } catch (e) { console.error(e); }
+};
+
 // ==========================================
 //           COMPONENTE PRINCIPAL
 // ==========================================
-export default function App() {
+function App() {
   const [user, setUser] = useState(null);
   const [loadingSession, setLoadingSession] = useState(true);
   const [showPSE, setShowPSE] = useState(false);
 
   useEffect(() => {
     const savedUser = localStorage.getItem('erp_user');
-    if (savedUser && savedUser !== "undefined") {
+    if (savedUser) {
         try { 
             const parsed = JSON.parse(savedUser);
             if(parsed && parsed.id) setUser(parsed);
@@ -46,7 +72,7 @@ export default function App() {
     localStorage.removeItem('erp_user');
   };
 
-  if (loadingSession) return <div className="h-screen flex items-center justify-center font-black text-blue-600 animate-pulse">INICIANDO...</div>;
+  if (loadingSession) return <div className="h-screen flex items-center justify-center font-black text-blue-600 animate-pulse">INICIANDO ACCUCLOUD...</div>;
   if (showPSE) return <PSEPage onBack={() => setShowPSE(false)} />;
 
   return (
@@ -68,20 +94,20 @@ function LoginScreen({ onLogin, onBuy }) {
     try {
       if (isRegistering) {
         await axios.post('/register', regForm);
-        window.alert("Empresa registrada. Ya puedes entrar."); setIsRegistering(false);
+        window.alert("Empresa registrada. Ahora puedes ingresar."); setIsRegistering(false);
       } else {
         const res = await axios.post('/login', { email, password });
         if (res.data.success) onLogin(res.data.user);
         else window.alert('Datos incorrectos');
       }
-    } catch (e) { window.alert('Error de conexión. Reintenta en 10 segundos.'); }
+    } catch (e) { window.alert('Error de conexión o servidor despertando.'); }
   };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-blue-600 p-4">
       <div className="bg-white p-12 rounded-[50px] shadow-2xl w-full max-w-md">
         <h1 className="text-4xl font-black text-center text-slate-800 mb-2 italic tracking-tighter">AccuCloud<span className="text-blue-600">.</span></h1>
-        <p className="text-center text-slate-400 font-bold text-[10px] uppercase mb-10 tracking-widest">{isRegistering ? 'Crear Cuenta SaaS' : 'Ingreso'}</p>
+        <p className="text-center text-slate-400 font-bold text-[10px] uppercase mb-10 tracking-widest">{isRegistering ? 'Crear Cuenta SaaS' : 'Ingreso al Sistema'}</p>
         <form onSubmit={handleAuth} className="space-y-4">
           {isRegistering && <input className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold" placeholder="Nombre Empresa" onChange={e=>setRegForm({...regForm, nombre:e.target.value})} required/>}
           <input className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold" value={isRegistering ? regForm.email : email} onChange={e => isRegistering ? setRegForm({...regForm, email:e.target.value}) : setEmail(e.target.value)} placeholder="Email" required />
@@ -91,9 +117,9 @@ function LoginScreen({ onLogin, onBuy }) {
           </button>
         </form>
         <button onClick={onBuy} className="w-full mt-10 p-4 bg-green-50 text-green-600 border-2 border-green-200 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-green-100 transition-all">
-            Haz parte del mejor sistema ($600.000)
+            Haz parte del mejor sistema para tu negocio ($600.000)
         </button>
-        <button onClick={()=>setIsRegistering(!isRegistering)} className="w-full mt-4 text-blue-600 font-black text-sm hover:underline">
+        <button onClick={()=>setIsRegistering(!isRegistering)} className="w-full mt-4 text-blue-600 font-black text-sm hover:underline uppercase tracking-tighter">
             {isRegistering ? 'Ya tengo cuenta' : 'Registrar Nueva Empresa'}
         </button>
       </div>
@@ -115,18 +141,17 @@ function Dashboard({ user, onLogout }) {
 
   const canSee = (roles) => roles.includes(user?.cargo);
 
-  // PROTECCIÓN PANTALLA BLANCA
-  if (!user) return null;
-
   return (
     <div className="flex h-screen overflow-hidden bg-slate-50 flex-col md:flex-row">
       <div className="md:hidden bg-white p-4 flex justify-between items-center border-b shadow-sm z-30">
         <h1 className="font-black text-xl italic">ACCUCLOUD<span className="text-blue-600">.</span></h1>
-        <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2 bg-slate-100 rounded-xl"><Menu /></button>
+        <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2 bg-slate-100 rounded-xl">
+          {isMobileMenuOpen ? <X /> : <Menu />}
+        </button>
       </div>
 
       <aside className={`fixed inset-y-0 left-0 z-40 w-72 bg-white border-r transform transition-transform duration-300 ease-in-out px-6 flex flex-col md:relative md:translate-x-0 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-        <div className="h-28 hidden md:flex items-center font-black text-2xl text-slate-800 italic uppercase">ACCUCLOUD <span className="text-blue-600">.</span></div>
+        <div className="h-28 hidden md:flex items-center font-black text-2xl text-slate-800 italic uppercase tracking-tighter">ACCUCLOUD <span className="text-blue-600">.</span></div>
         <nav className="flex-1 space-y-1 overflow-y-auto mt-10 md:mt-0">
           {canSee(['Admin', 'Contador']) && <MenuButton icon={<LayoutDashboard size={20}/>} label="Dashboard" active={activeTab==='dashboard'} onClick={()=>{setActiveTab('dashboard'); setIsMobileMenuOpen(false);}} />}
           {canSee(['Admin', 'Vendedor']) && <MenuButton icon={<ShoppingCart size={20}/>} label="Ventas (TPV)" active={activeTab==='ventas'} onClick={()=>{setActiveTab('ventas'); setIsMobileMenuOpen(false);}} />}
@@ -135,21 +160,26 @@ function Dashboard({ user, onLogout }) {
           {canSee(['Admin', 'Nomina']) && <MenuButton icon={<Users size={20}/>} label="Nómina PRO" active={activeTab==='nomina'} onClick={()=>{setActiveTab('nomina'); setIsMobileMenuOpen(false);}} />}
           {canSee(['Admin', 'Contador']) && <MenuButton icon={<Calculator size={20}/>} label="Contabilidad" active={activeTab==='conta'} onClick={()=>{setActiveTab('conta'); setIsMobileMenuOpen(false);}} />}
           {canSee(['Admin', 'Vendedor']) && <MenuButton icon={<Wallet size={20}/>} label="Caja y Turnos" active={activeTab==='caja'} onClick={()=>{setActiveTab('caja'); setIsMobileMenuOpen(false);}} />}
-          {user?.cargo === 'Admin' && <MenuButton icon={<ShieldCheck size={20}/>} label="Usuarios" active={activeTab==='admin'} onClick={()=>{setActiveTab('admin'); setIsMobileMenuOpen(false);}} />}
+          {user?.cargo === 'Admin' && <MenuButton icon={<ShieldCheck size={20}/>} label="Admin Usuarios" active={activeTab==='admin'} onClick={()=>{setActiveTab('admin'); setIsMobileMenuOpen(false);}} />}
         </nav>
         <div className="py-8 border-t space-y-4">
             <div className="bg-slate-50 p-4 rounded-3xl flex items-center gap-3 border border-slate-100">
                 <div className="w-10 h-10 bg-blue-600 rounded-2xl flex items-center justify-center text-white font-black">{user?.nombre?.charAt(0)}</div>
-                <div className="overflow-hidden"><p className="font-black text-slate-800 text-sm truncate">{user?.nombre}</p></div>
+                <div className="overflow-hidden">
+                    <p className="font-black text-slate-800 text-sm truncate">{user?.nombre}</p>
+                    <p className="text-[9px] font-black text-slate-400 uppercase">{user?.cargo}</p>
+                </div>
             </div>
             <button onClick={onLogout} className="w-full text-red-500 text-xs font-black py-2 hover:bg-red-50 rounded-xl transition uppercase tracking-widest">Salir</button>
         </div>
       </aside>
 
+      {isMobileMenuOpen && <div onClick={()=>setIsMobileMenuOpen(false)} className="fixed inset-0 bg-black/20 z-30 md:hidden backdrop-blur-sm"></div>}
+
       <main className="flex-1 overflow-auto p-4 md:p-10">
         <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 md:mb-10 gap-4">
             <h2 className="text-3xl md:text-4xl font-black text-slate-800 tracking-tighter capitalize italic">{activeTab}</h2>
-            {turnoActivo ? <div className="w-full md:w-auto px-4 py-2 bg-green-100 text-green-700 rounded-xl text-[10px] font-black flex items-center justify-center gap-2 border border-green-200"><div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div> EN TURNO: {user?.nombre?.toUpperCase()} | {fmt(turnoActivo?.total_vendido || 0)}</div> : <div className="w-full md:w-auto px-4 py-2 bg-red-100 text-red-700 rounded-xl text-[10px] font-black border border-red-200 text-center uppercase tracking-widest">Caja Cerrada</div>}
+            {turnoActivo ? <div className="w-full md:w-auto px-4 py-2 bg-green-100 text-green-700 rounded-xl text-[10px] font-black flex items-center justify-center gap-2 border border-green-200 uppercase tracking-widest"><div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div> EN TURNO: {user?.nombre?.toUpperCase()} | {fmt(turnoActivo.total_vendido)}</div> : <div className="w-full md:w-auto px-4 py-2 bg-red-100 text-red-700 rounded-xl text-[10px] font-black border border-red-200 text-center uppercase tracking-widest">Caja Cerrada</div>}
         </header>
 
         <div className="pb-20 md:pb-0">
@@ -177,10 +207,10 @@ function ResumenView({ user }) {
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
-        <CardStat title="Balance" value={fmt(data?.cajaMayor || 0)} icon={<DollarSign size={16}/>} color="blue" />
-        <CardStat title="Caja" value={fmt(data?.cajaMenor || 0)} icon={<Wallet size={16}/>} color="green" />
-        <CardStat title="Stock" value={fmt(data?.valorInventario || 0)} icon={<Package size={16}/>} color="purple" />
-        <CardStat title="Alertas" value={data?.lowStock || 0} icon={<AlertTriangle size={16}/>} color="red" />
+        <CardStat title="Balance" value={fmt(data.cajaMayor)} icon={<DollarSign size={16}/>} color="blue" />
+        <CardStat title="Caja" value={fmt(data.cajaMenor)} icon={<Wallet size={16}/>} color="green" />
+        <CardStat title="Stock" value={fmt(data.valorInventario)} icon={<Package size={16}/>} color="purple" />
+        <CardStat title="Alertas" value={data.lowStock} icon={<AlertTriangle size={16}/>} color="red" />
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
           <div className="bg-white p-6 md:p-10 rounded-[30px] md:rounded-[40px] shadow-sm border border-slate-100 h-80 md:h-96">
@@ -195,7 +225,7 @@ function ResumenView({ user }) {
           </div>
           <div className="bg-white p-6 md:p-10 rounded-[30px] md:rounded-[40px] shadow-sm border border-slate-100 h-80 md:h-96 overflow-auto">
               <h3 className="font-black text-slate-800 mb-6 tracking-tighter text-lg uppercase italic">Ventas Recientes</h3>
-              {(data?.recentSales || []).map(v => (
+              {(data.recentSales || []).map(v => (
                   <div key={v.id} className="flex justify-between items-center p-4 bg-slate-50 rounded-2xl mb-2">
                       <div className="text-xs font-bold text-slate-700 truncate mr-2">{v.nombre_producto}</div>
                       <span className="font-black text-slate-800 text-sm whitespace-nowrap">{fmt(v.total)}</span>
@@ -219,7 +249,7 @@ function CajaView({ user, turnoActivo, onUpdate }) {
             <div className="bg-white p-10 rounded-[40px] shadow-xl border border-blue-50 text-center flex flex-col justify-center">
                 <div className={`w-24 h-24 mx-auto rounded-[32px] flex items-center justify-center mb-8 ${turnoActivo ? 'bg-green-50 text-green-500' : 'bg-red-50 text-red-500'}`}>{turnoActivo ? <ScanBarcode size={48}/> : <Lock size={48}/>}</div>
                 <h3 className="text-3xl font-black mb-2 tracking-tighter uppercase italic">{turnoActivo ? "Turno Activo" : "Caja Cerrada"}</h3>
-                {turnoActivo && <div className="bg-slate-50 p-6 rounded-3xl mb-8 text-left font-black tracking-tight italic">Ventas Hoy: <span className="text-green-600">{fmt(turnoActivo?.total_vendido || 0)}</span></div>}
+                {turnoActivo && <div className="bg-slate-50 p-6 rounded-3xl mb-8 text-left font-black tracking-tight italic">Ventas Hoy: <span className="text-green-600">{fmt(turnoActivo.total_vendido)}</span></div>}
                 <button onClick={async ()=>{
                     if(turnoActivo){ if(window.confirm("¿Cerrar?")) { await axios.put('/turnos/finalizar', { turno_id: turnoActivo.id }); onUpdate(); loadHistorial(); } }
                     else { 
@@ -280,10 +310,7 @@ function VentasView({ user, turnoActivo }) {
       try {
           const res = await axios.post('/ventas', { productos: cart, responsable: user.nombre, turno_id: turnoActivo.id, metodo_pago: metodo, pago_recibido: pagaCon, cambio: devuelta, company_id: user.company_id });
           if(res.data.success) {
-              const doc = new jsPDF({ unit: 'mm', format: [80, 150 + (cart.length * 10)] }); 
-              doc.setFontSize(14); doc.text("ACCUCLOUD ERP", 40, 10, {align: 'center'});
-              autoTable(doc, { startY: 30, head: [['Cant', 'Prod', 'Total']], body: cart.map(p => [p.cantidad, p.nombre, fmt(p.precio * p.cantidad)]) });
-              window.open(doc.output('bloburl'), '_blank');
+              imprimirFactura(cart, totalVenta, user.nombre, metodo, null, pagaCon, devuelta);
               setCart([]); setPagaCon(''); window.alert("Venta exitosa."); load();
           }
       } catch (e) { window.alert("Error servidor."); }
@@ -340,31 +367,16 @@ function InventarioView({ user }) {
       window.alert("Actualizado."); setMode('list'); load();
   };
 
-  const handleImportExcel = (e) => {
-    const file = e.target.files[0]; if (!file) return;
-    const reader = new FileReader();
-    reader.onload = async (evt) => {
-      const bstr = evt.target.result; const wb = XLSX.read(bstr, { type: 'binary' });
-      const data = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
-      const prods = data.map(item => ({ nombre: item.Nombre || item.nombre, sku: item.SKU || item.sku, precio: item.Precio || item.precio, stock: item.Stock || item.stock, min_stock: item.Minimo || 5 }));
-      if (window.confirm(`¿Importar ${prods.length} productos?`)) {
-        try { await axios.post('/productos/importar', { productos: prods, responsable: user.nombre, company_id: user.company_id }); window.alert("Éxito"); load(); } catch (e) { window.alert("Error"); }
-      }
-    };
-    reader.readAsBinaryString(file);
-  };
-
   return (
     <div className="space-y-10 animate-fade-in">
         <div className="flex gap-4 p-2 bg-white border rounded-3xl w-fit shadow-sm overflow-x-auto">
             <button onClick={()=>setMode('list')} className={`px-8 py-3 rounded-2xl font-black text-[10px] uppercase transition-all whitespace-nowrap ${mode==='list'?'bg-blue-600 text-white shadow-xl':'text-slate-400'}`}>Stock y Lotes</button>
             <button onClick={()=>setMode('ajuste')} className={`px-8 py-3 rounded-2xl font-black text-[10px] uppercase transition-all whitespace-nowrap ${mode==='ajuste'?'bg-blue-600 text-white shadow-xl':'text-slate-400'}`}>Ajustar Stock</button>
-            <label className="bg-slate-900 text-white px-8 py-3 rounded-2xl font-black text-[10px] uppercase cursor-pointer hover:bg-black flex items-center gap-2"><Upload size={14}/> CARGA EXCEL<input type="file" accept=".xlsx, .xls, .csv" onChange={handleImportExcel} className="hidden" /></label>
         </div>
 
         {mode === 'list' ? (
             <div className="space-y-10">
-                <div className="bg-white p-10 rounded-[40px] shadow-sm border border-slate-100 h-fit">
+                <div className="bg-white p-8 rounded-[40px] shadow-sm border border-slate-100 h-fit">
                     <h3 className="font-black text-xl mb-8 tracking-tighter uppercase italic text-slate-800">Ingresar Lote</h3>
                     <form onSubmit={async (e)=>{e.preventDefault(); await axios.post('/productos', {...form, company_id: user.company_id}); load();}} className="grid grid-cols-2 md:grid-cols-4 gap-4">
                         <input className="p-4 bg-slate-50 border-none rounded-2xl font-bold" placeholder="Nombre" onChange={e=>setForm({...form, nombre:e.target.value})} required/>
@@ -477,7 +489,7 @@ function NominaView({ user }) {
                   <button onClick={()=>setMode('empleados')} className="w-full mt-10 py-3 bg-white/10 hover:bg-white/20 rounded-2xl font-bold text-xs transition-all text-slate-300">VOLVER</button>
               </div>
               <div className="lg:col-span-2 space-y-6">
-                  <h3 className="font-black text-2xl tracking-tighter text-slate-800 uppercase italic">Pagos Cloud</h3>
+                  <h3 className="font-black text-2xl tracking-tighter text-slate-800 uppercase italic">Historial de Pagos</h3>
                   <div className="bg-white rounded-[40px] shadow-sm border border-slate-100 overflow-hidden pr-2"><div className="overflow-x-auto"><table className="w-full text-left"><thead className="bg-slate-50/50 text-[10px] font-black uppercase tracking-widest border-b"><tr className="border-b"><th className="p-6">Fecha</th><th className="text-right p-6">Neto Pagado</th></tr></thead><tbody>{(empHistory || []).map(h => (<tr key={h.id} className="border-b hover:bg-slate-50 transition-all"><td className="p-6 text-sm font-bold text-slate-500">{new Date(h.fecha_pago).toLocaleDateString()}</td><td className="p-6 text-right font-black text-blue-600">{fmt(h.neto_pagar)}</td></tr>))}</tbody></table></div></div>
               </div>
           </div>
@@ -622,9 +634,9 @@ function MenuButton({ icon, label, active, onClick }) { return <button onClick={
 function CardStat({ title, value, icon, color }) { 
     const c = { green: "text-green-600 bg-green-50", blue: "text-blue-600 bg-blue-50", purple: "text-purple-600 bg-purple-50", red: "text-red-600 bg-red-50" };
     return <div className="bg-white p-6 md:p-8 rounded-[30px] md:rounded-[40px] shadow-sm border border-slate-100 hover:shadow-xl transition-shadow duration-300">
-        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mb-4 ${c[color]}`}>{icon}</div>
+        <div className={`w-10 h-10 md:w-12 md:h-12 rounded-2xl flex items-center justify-center mb-4 ${c[color]}`}>{icon}</div>
         <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1 text-xs">{title}</p>
-        <h3 className="text-2xl font-black text-slate-800 mt-1 tracking-tighter leading-none">{value}</h3>
+        <h3 className="text-sm md:text-2xl font-black text-slate-800 truncate">{value}</h3>
     </div>; 
 }
 
