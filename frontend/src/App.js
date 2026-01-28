@@ -1,4 +1,5 @@
-/* eslint-disable */
+/* eslint-disable react-hooks/exhaustive-deps */
+/* eslint-disable no-unused-vars */
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import jsPDF from 'jspdf';
@@ -7,11 +8,11 @@ import * as XLSX from 'xlsx';
 import { 
   LayoutDashboard, Package, ShoppingCart, Users, DollarSign, 
   AlertTriangle, Wallet, Lock, Mail, Calculator, 
-  ScanBarcode, Upload, X, ShieldCheck, ChevronDown, UserCircle, RefreshCcw, Menu, TrendingUp, Landmark, Warehouse, Truck, History
+  ScanBarcode, Upload, X, ShieldCheck, ChevronDown, UserCircle, RefreshCcw, Menu, TrendingUp, Factory, Truck, CreditCard, Settings, ChevronRight
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
-// CONFIGURACIÓN DE RED (Sincronizada con Vercel)
+// CONFIGURACIÓN DE RED
 axios.defaults.headers.common['ngrok-skip-browser-warning'] = 'true';
 axios.defaults.baseURL = window.location.origin + '/api';
 
@@ -43,6 +44,9 @@ const imprimirFactura = (cart, total, responsable, metodo, cliente, recibido, ca
     } catch (e) { console.error(e); }
 };
 
+// ==========================================
+//           COMPONENTE PRINCIPAL
+// ==========================================
 function App() {
   const [user, setUser] = useState(null);
   const [loadingSession, setLoadingSession] = useState(true);
@@ -64,7 +68,7 @@ function App() {
     localStorage.removeItem('erp_user');
   };
 
-  if (loadingSession) return <div className="h-screen flex items-center justify-center font-black text-blue-600">CARGANDO...</div>;
+  if (loadingSession) return <div className="h-screen flex items-center justify-center font-black text-blue-600">CARGANDO SISTEMA...</div>;
   if (showPSE) return <PSEPage onBack={() => setShowPSE(false)} />;
 
   return (
@@ -74,6 +78,7 @@ function App() {
   );
 }
 
+// --- LOGIN ---
 function LoginScreen({ onLogin, onBuy }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -91,14 +96,14 @@ function LoginScreen({ onLogin, onBuy }) {
         if (res.data.success) onLogin(res.data.user);
         else window.alert('Datos incorrectos');
       }
-    } catch (e) { window.alert('Backend despertando... reintenta en 10 segundos.'); }
+    } catch (e) { window.alert('Error de conexión o Backend despertando...'); }
   };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-blue-600 p-4">
       <div className="bg-white p-12 rounded-[50px] shadow-2xl w-full max-w-md">
         <h1 className="text-4xl font-black text-center text-slate-800 mb-2 italic tracking-tighter">AccuCloud<span className="text-blue-600">.</span></h1>
-        <p className="text-center text-slate-400 font-bold text-[10px] uppercase mb-10 tracking-widest">{isRegistering ? 'Crear Cuenta SaaS' : 'Ingreso al Sistema'}</p>
+        <p className="text-center text-slate-400 font-bold text-[10px] uppercase mb-10 tracking-widest">{isRegistering ? 'Crear Cuenta' : 'Ingreso'}</p>
         <form onSubmit={handleAuth} className="space-y-4">
           {isRegistering && <input className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold" placeholder="Nombre Empresa" onChange={e=>setRegForm({...regForm, nombre:e.target.value})} required/>}
           <input className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold" value={isRegistering ? regForm.email : email} onChange={e => isRegistering ? setRegForm({...regForm, email:e.target.value}) : setEmail(e.target.value)} placeholder="Email" required />
@@ -108,9 +113,9 @@ function LoginScreen({ onLogin, onBuy }) {
           </button>
         </form>
         <button onClick={onBuy} className="w-full mt-10 p-4 bg-green-50 text-green-600 border-2 border-green-200 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-green-100 transition-all">
-            Haz parte del mejor sistema para tu negocio ($600.000)
+            Haz parte del mejor sistema para tu negocio
         </button>
-        <button onClick={()=>setIsRegistering(!isRegistering)} className="w-full mt-4 text-blue-600 font-black text-sm hover:underline uppercase tracking-tighter">
+        <button onClick={()=>setIsRegistering(!isRegistering)} className="w-full mt-4 text-blue-600 font-black text-sm hover:underline">
             {isRegistering ? 'Ya tengo cuenta' : 'Registrar Nueva Empresa'}
         </button>
       </div>
@@ -118,14 +123,15 @@ function LoginScreen({ onLogin, onBuy }) {
   );
 }
 
+// --- DASHBOARD LAYOUT ---
 function Dashboard({ user, onLogout }) {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [turnoActivo, setTurnoActivo] = useState(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const recargarTurno = useCallback(() => {
-    axios.get('/turnos/activo/' + user.id).then(res => setTurnoActivo(res.data));
-  }, [user.id]);
+    if (user?.id) axios.get('/turnos/activo/' + user.id).then(res => setTurnoActivo(res.data));
+  }, [user?.id]);
 
   useEffect(() => { recargarTurno(); }, [recargarTurno]);
 
@@ -139,21 +145,21 @@ function Dashboard({ user, onLogout }) {
       </div>
 
       <aside className={`fixed inset-y-0 left-0 z-40 w-72 bg-white border-r transform transition-transform duration-300 ease-in-out px-6 flex flex-col md:relative md:translate-x-0 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-        <div className="h-28 hidden md:flex items-center font-black text-2xl text-slate-800 italic uppercase tracking-tighter">ACCUCLOUD <span className="text-blue-600">.</span></div>
+        <div className="h-28 hidden md:flex items-center font-black text-2xl text-slate-800 italic uppercase">ACCUCLOUD <span className="text-blue-600">.</span></div>
         <nav className="flex-1 space-y-1 overflow-y-auto mt-10 md:mt-0">
-          {['Admin', 'Contador'].includes(user.cargo) && <MenuButton icon={<LayoutDashboard size={20}/>} label="Dashboard" active={activeTab==='dashboard'} onClick={()=>{setActiveTab('dashboard'); setIsMobileMenuOpen(false);}} />}
-          {['Admin', 'Vendedor'].includes(user.cargo) && <MenuButton icon={<ShoppingCart size={20}/>} label="Ventas (TPV)" active={activeTab==='ventas'} onClick={()=>{setActiveTab('ventas'); setIsMobileMenuOpen(false);}} />}
-          {['Admin', 'Bodeguero', 'Prealistador'].includes(user.cargo) && <MenuButton icon={<Package size={20}/>} label="Inventario" active={activeTab==='inventario'} onClick={()=>{setActiveTab('inventario'); setIsMobileMenuOpen(false);}} />}
-          {['Admin', 'Prealistador', 'Produccion', 'Logistica'].includes(user.cargo) && <MenuButton icon={<Factory size={20}/>} label="Producción" active={activeTab==='produccion'} onClick={()=>{setActiveTab('produccion'); setIsMobileMenuOpen(false);}} />}
-          {['Admin', 'Nomina'].includes(user.cargo) && <MenuButton icon={<Users size={20}/>} label="Nómina PRO" active={activeTab==='nomina'} onClick={()=>{setActiveTab('nomina'); setIsMobileMenuOpen(false);}} />}
-          {['Admin', 'Contador'].includes(user.cargo) && <MenuButton icon={<Calculator size={20}/>} label="Contabilidad" active={activeTab==='conta'} onClick={()=>{setActiveTab('conta'); setIsMobileMenuOpen(false);}} />}
-          {['Admin', 'Vendedor'].includes(user.cargo) && <MenuButton icon={<Wallet size={20}/>} label="Caja y Turnos" active={activeTab==='caja'} onClick={()=>{setActiveTab('caja'); setIsMobileMenuOpen(false);}} />}
-          {user.cargo === 'Admin' && <MenuButton icon={<ShieldCheck size={20}/>} label="Admin Usuarios" active={activeTab==='admin'} onClick={()=>{setActiveTab('admin'); setIsMobileMenuOpen(false);}} />}
+          <MenuButton icon={<LayoutDashboard size={20}/>} label="Dashboard" active={activeTab==='dashboard'} onClick={()=>{setActiveTab('dashboard'); setIsMobileMenuOpen(false);}} />
+          <MenuButton icon={<ShoppingCart size={20}/>} label="Ventas (TPV)" active={activeTab==='ventas'} onClick={()=>{setActiveTab('ventas'); setIsMobileMenuOpen(false);}} />
+          <MenuButton icon={<Package size={20}/>} label="Inventario" active={activeTab==='inventario'} onClick={()=>{setActiveTab('inventario'); setIsMobileMenuOpen(false);}} />
+          <MenuButton icon={<Factory size={20}/>} label="Producción" active={activeTab==='produccion'} onClick={()=>{setActiveTab('produccion'); setIsMobileMenuOpen(false);}} />
+          <MenuButton icon={<Users size={20}/>} label="Nómina PRO" active={activeTab==='nomina'} onClick={()=>{setActiveTab('nomina'); setIsMobileMenuOpen(false);}} />
+          <MenuButton icon={<Calculator size={20}/>} label="Contabilidad" active={activeTab==='conta'} onClick={()=>{setActiveTab('conta'); setIsMobileMenuOpen(false);}} />
+          <MenuButton icon={<Wallet size={20}/>} label="Caja y Turnos" active={activeTab==='caja'} onClick={()=>{setActiveTab('caja'); setIsMobileMenuOpen(false);}} />
+          {user?.cargo === 'Admin' && <MenuButton icon={<ShieldCheck size={20}/>} label="Admin Usuarios" active={activeTab==='admin'} onClick={()=>{setActiveTab('admin'); setIsMobileMenuOpen(false);}} />}
         </nav>
         <div className="py-8 border-t space-y-4">
             <div className="bg-slate-50 p-4 rounded-3xl flex items-center gap-3 border border-slate-100">
-                <div className="w-10 h-10 bg-blue-600 rounded-2xl flex items-center justify-center text-white font-black">{user.nombre.charAt(0)}</div>
-                <div className="overflow-hidden"><p className="font-black text-slate-800 text-sm truncate">{user.nombre}</p><p className="text-[9px] font-black text-slate-400 uppercase">{user.cargo}</p></div>
+                <div className="w-10 h-10 bg-blue-600 rounded-2xl flex items-center justify-center text-white font-black">{user?.nombre?.charAt(0)}</div>
+                <div className="overflow-hidden"><p className="font-black text-slate-800 text-sm truncate">{user?.nombre}</p></div>
             </div>
             <button onClick={onLogout} className="w-full text-red-500 text-xs font-black py-2 hover:bg-red-50 rounded-xl transition uppercase tracking-widest">Salir</button>
         </div>
@@ -164,7 +170,7 @@ function Dashboard({ user, onLogout }) {
       <main className="flex-1 overflow-auto p-4 md:p-10">
         <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 md:mb-10 gap-4">
             <h2 className="text-3xl md:text-4xl font-black text-slate-800 tracking-tighter capitalize italic">{activeTab}</h2>
-            {turnoActivo ? <div className="w-full md:w-auto px-4 py-2 bg-green-100 text-green-700 rounded-xl text-[10px] font-black flex items-center justify-center gap-2 border border-green-200 uppercase tracking-widest"><div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div> EN TURNO: {user.nombre.toUpperCase()} | {fmt(turnoActivo.total_vendido)}</div> : <div className="w-full md:w-auto px-4 py-2 bg-red-100 text-red-700 rounded-xl text-[10px] font-black border border-red-200 text-center uppercase tracking-widest">Caja Cerrada</div>}
+            {turnoActivo ? <div className="w-full md:w-auto px-4 py-2 bg-green-100 text-green-700 rounded-xl text-[10px] font-black flex items-center justify-center gap-2 border border-green-200 uppercase tracking-widest"><div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div> EN TURNO: {user?.nombre?.toUpperCase()} | {fmt(turnoActivo.total_vendido)}</div> : <div className="w-full md:w-auto px-4 py-2 bg-red-100 text-red-700 rounded-xl text-[10px] font-black border border-red-200 text-center uppercase tracking-widest">Caja Cerrada</div>}
         </header>
         <div className="pb-20 md:pb-0">
           {activeTab==='dashboard' && <ResumenView user={user}/>}
@@ -184,7 +190,7 @@ function Dashboard({ user, onLogout }) {
 // --- VISTA DASHBOARD ---
 function ResumenView({ user }) {
   const [data, setData] = useState({ cajaMayor: 0, cajaMenor: 0, valorInventario: 0, lowStock: 0, recentSales: [] });
-  useEffect(() => { axios.get(`/dashboard-data?company_id=${user.company_id}`).then(res => setData(res.data)); }, []);
+  useEffect(() => { axios.get(`/dashboard-data?company_id=${user?.company_id}`).then(res => setData(res.data)); }, []);
   const chartData = [{ name: 'L', v: 400 }, { name: 'M', v: 300 }, { name: 'M', v: 600 }, { name: 'J', v: 800 }, { name: 'V', v: 500 }, { name: 'S', v: 900 }, { name: 'D', v: 200 }];
   return (
     <div className="space-y-6 animate-fade-in">
@@ -223,8 +229,8 @@ function ResumenView({ user }) {
 function CajaView({ user, turnoActivo, onUpdate }) {
     const [historial, setHistorial] = useState([]);
     const loadHistorial = useCallback(() => {
-        axios.get(`/turnos/historial?company_id=${user.company_id}`).then(res => setHistorial(Array.isArray(res.data) ? res.data : []));
-    }, [user.company_id]);
+        axios.get(`/turnos/historial?company_id=${user?.company_id}`).then(res => setHistorial(Array.isArray(res.data) ? res.data : []));
+    }, [user?.company_id]);
     useEffect(() => { loadHistorial(); }, [loadHistorial]);
     return (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-fade-in">
@@ -243,7 +249,7 @@ function CajaView({ user, turnoActivo, onUpdate }) {
                         } else { window.alert("Clave maestra incorrecta"); }
                     }
                 }} className={`w-full py-5 rounded-3xl font-black text-white ${turnoActivo ? 'bg-red-500' : 'bg-blue-600'} transition-all active:scale-95 shadow-xl`}>
-                    {turnoActivo ? "REALIZAR CIERRE" : "ABRIR CON CLAVE MAESTRA"}
+                    {turnoActivo ? "REALIZAR CIERRE" : "ABRIR NUEVA CAJA"}
                 </button>
             </div>
             <div className="lg:col-span-2 bg-white rounded-[40px] shadow-sm border border-slate-100 overflow-hidden pr-2">
@@ -511,7 +517,7 @@ function NominaView({ user }) {
 
 // --- VISTA CONTABILIDAD ---
 function ContabilidadView({ user }) {
-    const [subTab, setSubTab] = useState('ventas'); // ventas, compras, balance
+    const [subTab, setSubTab] = useState('ventas');
     const [datos, setDatos] = useState([]);
     const [sort, setSort] = useState('fecha DESC');
     const [formCompra, setFormCompra] = useState({ proveedor: '', producto: '', cantidad: 0, costo: 0, lote: '', vencimiento: '', estado: 'Pagado', tipo: 'Recompra', origen_dinero: 'Mayor' });
