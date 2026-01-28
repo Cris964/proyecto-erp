@@ -11,39 +11,11 @@ import {
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
-// CONFIGURACIÓN DE RED (Sincronizada con Vercel)
+// CONFIGURACIÓN DE RED
 axios.defaults.headers.common['ngrok-skip-browser-warning'] = 'true';
 axios.defaults.baseURL = window.location.origin + '/api';
 
 const fmt = (number) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(number || 0);
-
-// ==========================================
-//    FUNCIÓN GLOBAL: IMPRESIÓN DE FACTURA
-// ==========================================
-const imprimirFactura = (cart, total, responsable, metodo, cliente, recibido, cambio) => {
-    try {
-        const doc = new jsPDF({ unit: 'mm', format: [80, 150 + (cart.length * 10)] }); 
-        const ancho = 80;
-        doc.setFontSize(14); doc.text("ACCUCLOUD ERP", ancho/2, 10, {align: 'center'});
-        doc.setFontSize(8);
-        doc.text(`Fecha: ${new Date().toLocaleString()}`, 5, 20);
-        doc.text(`Cajero: ${responsable}`, 5, 24);
-        doc.text(`Cliente: ${cliente?.nombre || 'General'}`, 5, 28);
-        autoTable(doc, {
-            startY: 35, margin: { left: 2, right: 2 },
-            head: [['Cant', 'Producto', 'Subt']],
-            body: cart.map(p => [p.cantidad, p.nombre.substring(0,12), fmt(p.precio * p.cantidad)]),
-            theme: 'plain', styles: { fontSize: 7 }
-        });
-        const finalY = doc.lastAutoTable.finalY + 5;
-        doc.setFontSize(10);
-        doc.text(`TOTAL: ${fmt(total)}`, ancho - 5, finalY, { align: 'right' });
-        doc.setFontSize(7);
-        doc.text(`Recibido: ${fmt(recibido || total)}`, 5, finalY + 5);
-        doc.text(`Cambio: ${fmt(cambio || 0)}`, 5, finalY + 9);
-        window.open(doc.output('bloburl'), '_blank');
-    } catch (e) { console.error(e); }
-};
 
 // ==========================================
 //           COMPONENTE PRINCIPAL
@@ -55,7 +27,13 @@ function App() {
 
   useEffect(() => {
     const savedUser = localStorage.getItem('erp_user');
-    if (savedUser) setUser(JSON.parse(savedUser));
+    if (savedUser) {
+        try {
+            setUser(JSON.parse(savedUser));
+        } catch (e) {
+            localStorage.removeItem('erp_user');
+        }
+    }
     setLoadingSession(false);
   }, []);
 
@@ -69,7 +47,7 @@ function App() {
     localStorage.removeItem('erp_user');
   };
 
-  if (loadingSession) return <div className="h-screen flex items-center justify-center font-black text-blue-600">CARGANDO SISTEMA...</div>;
+  if (loadingSession) return <div className="h-screen flex items-center justify-center font-black text-blue-600 animate-pulse">CARGANDO ACCUCLOUD...</div>;
   if (showPSE) return <PSEPage onBack={() => setShowPSE(false)} />;
 
   return (
@@ -91,13 +69,14 @@ function LoginScreen({ onLogin, onBuy }) {
     try {
       if (isRegistering) {
         await axios.post('/register', regForm);
-        window.alert("Empresa registrada. Ahora ingresa."); setIsRegistering(false);
+        window.alert("Empresa registrada con éxito. Ahora puedes ingresar.");
+        setIsRegistering(false);
       } else {
         const res = await axios.post('/login', { email, password });
         if (res.data.success) onLogin(res.data.user);
-        else window.alert('Datos incorrectos');
+        else window.alert('Datos incorrectos. Verifica tu email y contraseña.');
       }
-    } catch (e) { window.alert('Backend despertando... reintenta en 10 segundos.'); }
+    } catch (e) { window.alert('El servidor está despertando. Reintenta en 10 segundos.'); }
   };
 
   return (
@@ -106,11 +85,11 @@ function LoginScreen({ onLogin, onBuy }) {
         <h1 className="text-4xl font-black text-center text-slate-800 mb-2 italic tracking-tighter">AccuCloud<span className="text-blue-600">.</span></h1>
         <p className="text-center text-slate-400 font-bold text-[10px] uppercase mb-10 tracking-widest">{isRegistering ? 'Crear Cuenta SaaS' : 'Ingreso al Sistema'}</p>
         <form onSubmit={handleAuth} className="space-y-4">
-          {isRegistering && <input className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold" placeholder="Nombre Empresa" onChange={e=>setRegForm({...regForm, nombre:e.target.value})} required/>}
+          {isRegistering && <input className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold" placeholder="Nombre de tu Empresa" onChange={e=>setRegForm({...regForm, nombre:e.target.value})} required/>}
           <input className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold" value={isRegistering ? regForm.email : email} onChange={e => isRegistering ? setRegForm({...regForm, email:e.target.value}) : setEmail(e.target.value)} placeholder="Email" required />
           <input type="password" class="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold" value={isRegistering ? regForm.password : password} onChange={e => isRegistering ? setRegForm({...regForm, password:e.target.value}) : setPassword(e.target.value)} placeholder="Contraseña" required />
-          <button className="w-full bg-slate-900 text-white font-black py-4 rounded-2xl shadow-xl hover:bg-black transition-all">
-            {isRegistering ? 'REGISTRARME' : 'INGRESAR'}
+          <button className="w-full bg-slate-900 text-white font-black py-4 rounded-2xl shadow-xl hover:bg-black transition-all uppercase tracking-widest text-xs">
+            {isRegistering ? 'Registrar Empresa' : 'Entrar'}
           </button>
         </form>
         <button onClick={onBuy} className="w-full mt-10 p-4 bg-green-50 text-green-600 border-2 border-green-200 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-green-100 transition-all">
@@ -131,8 +110,8 @@ function Dashboard({ user, onLogout }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const recargarTurno = useCallback(() => {
-    if (user) axios.get('/turnos/activo/' + user.id).then(res => setTurnoActivo(res.data));
-  }, [user.id]);
+    if (user?.id) axios.get('/turnos/activo/' + user.id).then(res => setTurnoActivo(res.data));
+  }, [user?.id]);
 
   useEffect(() => { recargarTurno(); }, [recargarTurno]);
 
@@ -148,19 +127,19 @@ function Dashboard({ user, onLogout }) {
       <aside className={`fixed inset-y-0 left-0 z-40 w-72 bg-white border-r transform transition-transform duration-300 ease-in-out px-6 flex flex-col md:relative md:translate-x-0 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="h-28 hidden md:flex items-center font-black text-2xl text-slate-800 italic uppercase tracking-tighter">ACCUCLOUD <span className="text-blue-600">.</span></div>
         <nav className="flex-1 space-y-1 overflow-y-auto mt-10 md:mt-0">
-          {['Admin', 'Contador'].includes(user.cargo) && <MenuButton icon={<LayoutDashboard size={20}/>} label="Dashboard" active={activeTab==='dashboard'} onClick={()=>{setActiveTab('dashboard'); setIsMobileMenuOpen(false);}} />}
-          {['Admin', 'Vendedor'].includes(user.cargo) && <MenuButton icon={<ShoppingCart size={20}/>} label="Ventas (TPV)" active={activeTab==='ventas'} onClick={()=>{setActiveTab('ventas'); setIsMobileMenuOpen(false);}} />}
-          {['Admin', 'Bodeguero', 'Prealistador'].includes(user.cargo) && <MenuButton icon={<Package size={20}/>} label="Inventario" active={activeTab==='inventario'} onClick={()=>{setActiveTab('inventario'); setIsMobileMenuOpen(false);}} />}
-          {['Admin', 'Prealistador', 'Produccion', 'Logistica'].includes(user.cargo) && <MenuButton icon={<Factory size={20}/>} label="Producción" active={activeTab==='produccion'} onClick={()=>{setActiveTab('produccion'); setIsMobileMenuOpen(false);}} />}
-          {['Admin', 'Nomina'].includes(user.cargo) && <MenuButton icon={<Users size={20}/>} label="Nómina PRO" active={activeTab==='nomina'} onClick={()=>{setActiveTab('nomina'); setIsMobileMenuOpen(false);}} />}
-          {['Admin', 'Contador'].includes(user.cargo) && <MenuButton icon={<Calculator size={20}/>} label="Contabilidad" active={activeTab==='conta'} onClick={()=>{setActiveTab('conta'); setIsMobileMenuOpen(false);}} />}
-          {['Admin', 'Vendedor'].includes(user.cargo) && <MenuButton icon={<Wallet size={20}/>} label="Caja y Turnos" active={activeTab==='caja'} onClick={()=>{setActiveTab('caja'); setIsMobileMenuOpen(false);}} />}
-          {user.cargo === 'Admin' && <MenuButton icon={<ShieldCheck size={20}/>} label="Admin Usuarios" active={activeTab==='admin'} onClick={()=>{setActiveTab('admin'); setIsMobileMenuOpen(false);}} />}
+          {['Admin', 'Contador'].includes(user?.cargo) && <MenuButton icon={<LayoutDashboard size={20}/>} label="Dashboard" active={activeTab==='dashboard'} onClick={()=>{setActiveTab('dashboard'); setIsMobileMenuOpen(false);}} />}
+          {['Admin', 'Vendedor'].includes(user?.cargo) && <MenuButton icon={<ShoppingCart size={20}/>} label="Ventas (TPV)" active={activeTab==='ventas'} onClick={()=>{setActiveTab('ventas'); setIsMobileMenuOpen(false);}} />}
+          {['Admin', 'Bodeguero', 'Prealistador'].includes(user?.cargo) && <MenuButton icon={<Package size={20}/>} label="Inventario" active={activeTab==='inventario'} onClick={()=>{setActiveTab('inventario'); setIsMobileMenuOpen(false);}} />}
+          {['Admin', 'Prealistador', 'Produccion', 'Logistica'].includes(user?.cargo) && <MenuButton icon={<Factory size={20}/>} label="Producción" active={activeTab==='produccion'} onClick={()=>{setActiveTab('produccion'); setIsMobileMenuOpen(false);}} />}
+          {['Admin', 'Nomina'].includes(user?.cargo) && <MenuButton icon={<Users size={20}/>} label="Nómina PRO" active={activeTab==='nomina'} onClick={()=>{setActiveTab('nomina'); setIsMobileMenuOpen(false);}} />}
+          {['Admin', 'Contador'].includes(user?.cargo) && <MenuButton icon={<Calculator size={20}/>} label="Contabilidad" active={activeTab==='conta'} onClick={()=>{setActiveTab('conta'); setIsMobileMenuOpen(false);}} />}
+          {['Admin', 'Vendedor'].includes(user?.cargo) && <MenuButton icon={<Wallet size={20}/>} label="Caja y Turnos" active={activeTab==='caja'} onClick={()=>{setActiveTab('caja'); setIsMobileMenuOpen(false);}} />}
+          {user?.cargo === 'Admin' && <MenuButton icon={<ShieldCheck size={20}/>} label="Configuración" active={activeTab==='admin'} onClick={()=>{setActiveTab('admin'); setIsMobileMenuOpen(false);}} />}
         </nav>
         <div className="py-8 border-t space-y-4">
             <div className="bg-slate-50 p-4 rounded-3xl flex items-center gap-3 border border-slate-100">
-                <div className="w-10 h-10 bg-blue-600 rounded-2xl flex items-center justify-center text-white font-black">{user.nombre.charAt(0)}</div>
-                <div className="overflow-hidden"><p className="font-black text-slate-800 text-sm truncate">{user.nombre}</p><p className="text-[9px] font-black text-slate-400 uppercase">{user.cargo}</p></div>
+                <div className="w-10 h-10 bg-blue-600 rounded-2xl flex items-center justify-center text-white font-black">{user?.nombre?.charAt(0)}</div>
+                <div className="overflow-hidden"><p className="font-black text-slate-800 text-sm truncate">{user?.nombre}</p></div>
             </div>
             <button onClick={onLogout} className="w-full text-red-500 text-xs font-black py-2 hover:bg-red-50 rounded-xl transition uppercase tracking-widest">Salir</button>
         </div>
@@ -171,7 +150,7 @@ function Dashboard({ user, onLogout }) {
       <main className="flex-1 overflow-auto p-4 md:p-10">
         <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 md:mb-10 gap-4">
             <h2 className="text-3xl md:text-4xl font-black text-slate-800 tracking-tighter capitalize italic">{activeTab}</h2>
-            {turnoActivo ? <div className="w-full md:w-auto px-4 py-2 bg-green-100 text-green-700 rounded-xl text-[10px] font-black flex items-center justify-center gap-2 border border-green-200 uppercase tracking-widest"><div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div> EN TURNO: {user.nombre.toUpperCase()} | {fmt(turnoActivo.total_vendido)}</div> : <div className="w-full md:w-auto px-4 py-2 bg-red-100 text-red-700 rounded-xl text-[10px] font-black border border-red-200 text-center uppercase tracking-widest">Caja Cerrada</div>}
+            {turnoActivo ? <div className="w-full md:w-auto px-4 py-2 bg-green-100 text-green-700 rounded-xl text-[10px] font-black flex items-center justify-center gap-2 border border-green-200 uppercase tracking-widest"><div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div> EN TURNO: {user?.nombre?.toUpperCase()} | {fmt(turnoActivo.total_vendido)}</div> : <div className="w-full md:w-auto px-4 py-2 bg-red-100 text-red-700 rounded-xl text-[10px] font-black border border-red-200 text-center uppercase tracking-widest">Caja Cerrada</div>}
         </header>
         <div className="pb-20 md:pb-0">
           {activeTab==='dashboard' && <ResumenView user={user}/>}
@@ -191,7 +170,7 @@ function Dashboard({ user, onLogout }) {
 // --- VISTA DASHBOARD ---
 function ResumenView({ user }) {
   const [data, setData] = useState({ cajaMayor: 0, cajaMenor: 0, valorInventario: 0, lowStock: 0, recentSales: [] });
-  useEffect(() => { axios.get(`/dashboard-data?company_id=${user.company_id}`).then(res => setData(res.data)); }, []);
+  useEffect(() => { axios.get(`/dashboard-data?company_id=${user?.company_id}`).then(res => setData(res.data)); }, []);
   const chartData = [{ name: 'L', v: 400 }, { name: 'M', v: 300 }, { name: 'M', v: 600 }, { name: 'J', v: 800 }, { name: 'V', v: 500 }, { name: 'S', v: 900 }, { name: 'D', v: 200 }];
   return (
     <div className="space-y-6 animate-fade-in">
@@ -230,8 +209,8 @@ function ResumenView({ user }) {
 function CajaView({ user, turnoActivo, onUpdate }) {
     const [historial, setHistorial] = useState([]);
     const loadHistorial = useCallback(() => {
-        axios.get(`/turnos/historial?company_id=${user.company_id}`).then(res => setHistorial(Array.isArray(res.data) ? res.data : []));
-    }, [user.company_id]);
+        axios.get(`/turnos/historial?company_id=${user?.company_id}`).then(res => setHistorial(Array.isArray(res.data) ? res.data : []));
+    }, [user?.company_id]);
     useEffect(() => { loadHistorial(); }, [loadHistorial]);
     return (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-fade-in">
@@ -518,7 +497,7 @@ function NominaView({ user }) {
 
 // --- VISTA CONTABILIDAD ---
 function ContabilidadView({ user }) {
-    const [subTab, setSubTab] = useState('ventas');
+    const [subTab, setSubTab] = useState('ventas'); // ventas, compras, balance
     const [datos, setDatos] = useState([]);
     const [sort, setSort] = useState('fecha DESC');
     const [formCompra, setFormCompra] = useState({ proveedor: '', producto: '', cantidad: 0, costo: 0, lote: '', vencimiento: '', estado: 'Pagado', tipo: 'Recompra', origen_dinero: 'Mayor' });
@@ -627,6 +606,80 @@ function PSEPage({ onBack }) {
                 <button onClick={()=>window.alert("Redirigiendo...")} className="w-full py-6 bg-slate-900 text-white font-black rounded-[30px] shadow-2xl flex items-center justify-center gap-4 hover:bg-black transition-all text-sm"><CreditCard /> PAGAR CON PSE</button>
                 <button onClick={onBack} className="mt-8 text-slate-400 font-bold text-xs uppercase tracking-widest underline">VOLVER</button>
             </div>
+        </div>
+    );
+}
+
+// --- MÓDULO PRODUCCIÓN ---
+function ProduccionView({ user }) {
+    const [subTab, setSubTab] = useState('materia');
+    const [materias, setMaterias] = useState([]);
+    const [ordenes, setOrdenes] = useState([]);
+    const [formMateria, setFormMateria] = useState({ nombre: '', unidad: 'mg', cantidad: 0, proposito: '', costo: 0 });
+
+    const load = useCallback(async () => {
+        const resM = await axios.get(`/produccion/materia?company_id=${user.company_id}`);
+        const resO = await axios.get(`/produccion/ordenes?company_id=${user.company_id}`);
+        setMaterias(Array.isArray(resM.data) ? resM.data : []);
+        setOrdenes(Array.isArray(resO.data) ? resO.data : []);
+    }, [user.company_id]);
+
+    useEffect(() => { load(); }, [load, subTab]);
+
+    const avanzarOrden = async (id, nuevoEstado) => {
+        if(window.confirm(`¿Avanzar orden a ${nuevoEstado}?`)) {
+            await axios.put(`/produccion/ordenes/${id}/estado`, { estado: nuevoEstado });
+            load();
+        }
+    };
+
+    return (
+        <div className="space-y-8 animate-fade-in">
+            <div className="flex gap-4 p-2 bg-white border rounded-3xl w-fit shadow-sm overflow-x-auto">
+                {['Admin', 'Prealistador'].includes(user.cargo) && <button onClick={()=>setSubTab('materia')} className={`px-6 py-2 rounded-2xl font-black text-[10px] uppercase transition-all whitespace-nowrap ${subTab==='materia'?'bg-blue-600 text-white shadow-xl':'text-slate-400'}`}>Materia Prima</button>}
+                {['Admin', 'Prealistador', 'Produccion'].includes(user.cargo) && <button onClick={()=>setSubTab('ordenes')} className={`px-6 py-2 rounded-xl font-black text-[10px] uppercase transition-all whitespace-nowrap ${subTab==='ordenes'?'bg-blue-600 text-white shadow-xl':'text-slate-400'}`}>Órdenes</button>}
+                {['Admin', 'Logistica'].includes(user.cargo) && <button onClick={()=>setSubTab('logistica')} className={`px-6 py-2 rounded-xl font-black text-[10px] uppercase transition-all whitespace-nowrap ${subTab==='logistica'?'bg-blue-600 text-white shadow-xl':'text-slate-400'}`}>Logística</button>}
+            </div>
+
+            {subTab === 'materia' && (
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <div className="bg-white p-8 rounded-[40px] shadow-sm border h-fit">
+                        <h3 className="font-black text-xl mb-6 uppercase italic">Ingresar Insumo</h3>
+                        <form onSubmit={async (e)=>{e.preventDefault(); await axios.post('/produccion/materia', {...formMateria, company_id: user.company_id}); load();}} className="space-y-4">
+                            <input className="w-full p-4 bg-slate-50 rounded-2xl font-bold" placeholder="Nombre (Ej: Alcohol)" onChange={e=>setFormMateria({...formMateria, nombre: e.target.value})} required/>
+                            <select className="w-full p-4 bg-slate-50 rounded-2xl font-black" onChange={e=>setFormMateria({...formMateria, unidad: e.target.value})}>
+                                <option value="mg">Miligramos (mg)</option><option value="g">Gramos (g)</option><option value="ml">Mililitros (ml)</option><option value="unidades">Unidades</option>
+                            </select>
+                            <input className="w-full p-4 bg-slate-50 rounded-2xl font-bold" type="number" placeholder="Cantidad" onChange={e=>setFormMateria({...formMateria, cantidad: e.target.value})} required/>
+                            <button className="w-full py-4 bg-slate-900 text-white font-black rounded-2xl shadow-xl">GUARDAR EN STOCK</button>
+                        </form>
+                    </div>
+                    <div className="lg:col-span-2 bg-white rounded-[40px] shadow-sm border overflow-hidden">
+                        <table className="w-full text-left">
+                            <thead className="bg-slate-50 text-[10px] font-black uppercase"><tr><th className="p-6">Insumo</th><th>Cantidad</th><th>Costo</th></tr></thead>
+                            <tbody>{materias.map(m=>(<tr key={m.id} className="border-b"><td className="p-6 font-black">{m.nombre}</td><td>{m.cantidad} {m.unidad_medida}</td><td className="font-bold text-blue-600">{fmt(m.costo)}</td></tr>))}</tbody>
+                        </table>
+                    </div>
+                </div>
+            )}
+
+            {subTab === 'ordenes' && (
+                <div className="grid grid-cols-1 gap-6">
+                    {ordenes.filter(o => o.estado === 'Prealistamiento' || o.estado === 'Produccion').map(o => (
+                        <div key={o.id} className="bg-white p-8 rounded-[40px] shadow-md border-l-[15px] border-blue-500 flex justify-between items-center">
+                            <div>
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Orden #{o.id}</p>
+                                <h4 className="text-2xl font-black text-slate-800">{o.nombre_producto}</h4>
+                                <p className="font-bold text-blue-600 uppercase text-xs">Estado: {o.estado}</p>
+                            </div>
+                            <div className="flex gap-3">
+                                {o.estado === 'Prealistamiento' && user.cargo !== 'Produccion' && <button onClick={()=>avanzarOrden(o.id, 'Produccion')} className="px-8 py-3 bg-slate-900 text-white font-black rounded-2xl">INICIAR PRODUCCIÓN</button>}
+                                {o.estado === 'Produccion' && user.cargo !== 'Prealistador' && <button onClick={()=>avanzarOrden(o.id, 'Logistica')} className="px-8 py-3 bg-green-600 text-white font-black rounded-2xl">ENVIAR A LOGÍSTICA</button>}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
         </div>
     );
 }
