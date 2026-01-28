@@ -7,11 +7,11 @@ import * as XLSX from 'xlsx';
 import { 
   LayoutDashboard, Package, ShoppingCart, Users, DollarSign, 
   AlertTriangle, Wallet, Lock, Mail, Calculator, 
-  ScanBarcode, Upload, X, ShieldCheck, ChevronDown, UserCircle, RefreshCcw, Menu, TrendingUp, Landmark, Warehouse, Truck, History, Settings, ChevronRight, CreditCard
+  ScanBarcode, Upload, X, ShieldCheck, ChevronDown, UserCircle, RefreshCcw, Menu, TrendingUp, Factory, Truck, CreditCard, Settings, ChevronRight
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
-// CONFIGURACIÓN DE RED
+// CONFIGURACIÓN DE RED (Sincronizada con Vercel)
 axios.defaults.headers.common['ngrok-skip-browser-warning'] = 'true';
 axios.defaults.baseURL = window.location.origin + '/api';
 
@@ -69,7 +69,7 @@ function App() {
     localStorage.removeItem('erp_user');
   };
 
-  if (loadingSession) return <div className="h-screen flex items-center justify-center font-black text-blue-600 animate-pulse">CARGANDO...</div>;
+  if (loadingSession) return <div className="h-screen flex items-center justify-center font-black text-blue-600 animate-pulse">CARGANDO SISTEMA...</div>;
   if (showPSE) return <PSEPage onBack={() => setShowPSE(false)} />;
 
   return (
@@ -91,13 +91,13 @@ function LoginScreen({ onLogin, onBuy }) {
     try {
       if (isRegistering) {
         await axios.post('/register', regForm);
-        window.alert("Empresa registrada."); setIsRegistering(false);
+        window.alert("Empresa registrada. Ahora ingresa."); setIsRegistering(false);
       } else {
         const res = await axios.post('/login', { email, password });
         if (res.data.success) onLogin(res.data.user);
         else window.alert('Datos incorrectos');
       }
-    } catch (e) { window.alert('Error de conexión.'); }
+    } catch (e) { window.alert('Backend despertando... reintenta en 10 segundos.'); }
   };
 
   return (
@@ -109,14 +109,14 @@ function LoginScreen({ onLogin, onBuy }) {
           {isRegistering && <input className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold" placeholder="Nombre Empresa" onChange={e=>setRegForm({...regForm, nombre:e.target.value})} required/>}
           <input className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold" value={isRegistering ? regForm.email : email} onChange={e => isRegistering ? setRegForm({...regForm, email:e.target.value}) : setEmail(e.target.value)} placeholder="Email" required />
           <input type="password" class="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold" value={isRegistering ? regForm.password : password} onChange={e => isRegistering ? setRegForm({...regForm, password:e.target.value}) : setPassword(e.target.value)} placeholder="Contraseña" required />
-          <button className="w-full bg-slate-900 text-white font-black py-4 rounded-2xl shadow-xl hover:bg-black transition-all uppercase tracking-widest text-xs">
-            {isRegistering ? 'Registrarme' : 'Ingresar'}
+          <button className="w-full bg-slate-900 text-white font-black py-4 rounded-2xl shadow-xl hover:bg-black transition-all">
+            {isRegistering ? 'REGISTRARME' : 'INGRESAR'}
           </button>
         </form>
         <button onClick={onBuy} className="w-full mt-10 p-4 bg-green-50 text-green-600 border-2 border-green-200 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-green-100 transition-all">
             Haz parte del mejor sistema para tu negocio ($600.000)
         </button>
-        <button onClick={()=>setIsRegistering(!isRegistering)} className="w-full mt-4 text-blue-600 font-black text-sm hover:underline">
+        <button onClick={()=>setIsRegistering(!isRegistering)} className="w-full mt-4 text-blue-600 font-black text-sm hover:underline uppercase tracking-tighter">
             {isRegistering ? 'Ya tengo cuenta' : 'Registrar Nueva Empresa'}
         </button>
       </div>
@@ -148,7 +148,7 @@ function Dashboard({ user, onLogout }) {
       </div>
 
       <aside className={`fixed inset-y-0 left-0 z-40 w-72 bg-white border-r transform transition-transform duration-300 ease-in-out px-6 flex flex-col md:relative md:translate-x-0 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-        <div className="h-28 hidden md:flex items-center font-black text-2xl text-slate-800 italic uppercase">ACCUCLOUD <span className="text-blue-600">.</span></div>
+        <div className="h-28 hidden md:flex items-center font-black text-2xl text-slate-800 italic uppercase tracking-tighter">ACCUCLOUD <span className="text-blue-600">.</span></div>
         <nav className="flex-1 space-y-1 overflow-y-auto mt-10 md:mt-0">
           {canSee(['Admin', 'Contador']) && <MenuButton icon={<LayoutDashboard size={20}/>} label="Dashboard" active={activeTab==='dashboard'} onClick={()=>{setActiveTab('dashboard'); setIsMobileMenuOpen(false);}} />}
           {canSee(['Admin', 'Vendedor']) && <MenuButton icon={<ShoppingCart size={20}/>} label="Ventas (TPV)" active={activeTab==='ventas'} onClick={()=>{setActiveTab('ventas'); setIsMobileMenuOpen(false);}} />}
