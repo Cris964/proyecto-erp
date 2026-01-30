@@ -3,7 +3,10 @@ const express = require('express');
 const mysql = require('mysql2/promise');
 const cors = require('cors');
 const path = require('path');
+const jwt = require('jsonwebtoken'); // <--- 1. IMPORTAR JWT
 const app = express();
+
+const SECRET_KEY = process.env.JWT_SECRET || 'AccuCloud_Secret_2026_!#'; // <--- CLAVE MAESTRA
 
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
@@ -24,145 +27,100 @@ const q = async (sql, params) => {
     catch (e) { console.error("Error:", e.message); throw e; }
 };
 
+// --- 2. MIDDLEWARE DE SEGURIDAD (EL GUARDIÁN) ---
+const verificarToken = (req, res, next) => {
+    const authHeader = req.headers.authorization;
+    const token = authHeader && authHeader.split(' ')[1];
+
+    if (!token) return res.status(401).json({ error: "No autorizado" });
+
+    jwt.verify(token, SECRET_KEY, (err, decoded) => {
+        if (err) return res.status(403).json({ error: "Token inválido o expirado" });
+        req.user = decoded; // Aquí guardamos el ID y el COMPANY_ID del usuario
+        next();
+    });
+};
+
 // --- AUTH & USUARIOS ---
 app.post('/api/login', async (req, res) => {
     const rows = await q("SELECT * FROM usuarios WHERE email = ? AND password = ?", [req.body.email, req.body.password]);
-    if (rows.length > 0) res.json({ success: true, user: rows[0] });
-    else res.json({ success: false });
+    if (rows.length > 0) {
+        const user = rows[0];
+        // 3. GENERAR EL TOKEN CON EL COMPANY_ID ADENTRO
+        const token = jwt.sign(
+            { id: user.id, company_id: user.company_id, cargo: user.cargo }, 
+            SECRET_KEY, 
+            { expiresIn: '24h' }
+        );
+        res.json({ success: true, user, token });
+    } else {
+        res.json({ success: false });
+    }
 });
 
-app.get('/api/admin/usuarios', async (req, res) => {
-    const rows = await q("SELECT * FROM usuarios WHERE company_id = ?", [req.query.company_id]);
+// --- RUTAS PROTEGIDAS (Añadimos 'verificarToken') ---
+
+app.get('/api/admin/usuarios', verificarToken, async (req, res) => {
+    // Usamos req.user.company_id del token, no del query del frontend
+    const rows = await q("SELECT * FROM usuarios WHERE company_id = ?", [req.user.company_id]);
     res.json(rows);
 });
 
-app.post('/api/admin/usuarios', async (req, res) => {
-    const { nombre, email, password, cargo, company_id } = req.body;
-    await q("INSERT INTO usuarios (nombre, email, password, cargo, company_id) VALUES (?,?,?,?,?)", [nombre, email, password, cargo, company_id]);
-    res.json({ success: true });
-});
-
-app.put('/api/admin/usuarios/:id', async (req, res) => {
+app.post('/api/admin/usuarios', verificarToken, async (req, res) => {
     const { nombre, email, password, cargo } = req.body;
-    await q("UPDATE usuarios SET nombre=?, email=?, password=?, cargo=? WHERE id=?", [nombre, email, password, cargo, req.params.id]);
-    res.json({ success: true });
-});
-
-app.delete('/api/admin/usuarios/:id', async (req, res) => {
-    await q("DELETE FROM usuarios WHERE id = ?", [req.params.id]);
+    await q("INSERT INTO usuarios (nombre, email, password, cargo, company_id) VALUES (?,?,?,?,?)", 
+        [nombre, email, password, cargo, req.user.company_id]);
     res.json({ success: true });
 });
 
 // --- INVENTARIO & BODEGAS ---
-app.get('/api/productos', async (req, res) => {
-    const rows = await q("SELECT * FROM productos WHERE company_id = ?", [req.query.company_id]);
+app.get('/api/productos', verificarToken, async (req, res) => {
+    const rows = await q("SELECT * FROM productos WHERE company_id = ?", [req.user.company_id]);
     res.json(rows);
 });
 
-app.post('/api/productos', async (req, res) => {
-    const { nombre, sku, precio, stock, bodega_id, company_id } = req.body;
-    await q("INSERT INTO productos (nombre, sku, precio, stock, bodega_id, company_id) VALUES (?,?,?,?,?,?)", [nombre, sku, precio, stock, bodega_id, company_id]);
-    res.json({ success: true });
-});
-
-app.post('/api/productos/importar', async (req, res) => {
-    const { productos, company_id } = req.body;
-    for (const p of productos) {
-        await q("INSERT INTO productos (nombre, sku, precio, stock, company_id) VALUES (?,?,?,?,?) ON DUPLICATE KEY UPDATE stock = stock + ?", [p.nombre, p.sku, p.precio, p.stock, company_id, p.stock]);
-    }
-    res.json({ success: true });
-});
-
-app.get('/api/bodegas', async (req, res) => {
-    const rows = await q("SELECT * FROM bodegas WHERE company_id = ?", [req.query.company_id]);
-    res.json(rows);
-});
-
-app.post('/api/bodegas', async (req, res) => {
-    await q("INSERT INTO bodegas (nombre, company_id) VALUES (?,?)", [req.body.nombre, req.body.company_id]);
-    res.json({ success: true });
-});
-
-// --- PRODUCCIÓN ---
-app.get('/api/produccion/siguiente-numero', async (req, res) => {
-    const rows = await q("SELECT COUNT(*) as total FROM ordenes_produccion WHERE company_id = ?", [req.query.company_id]);
-    res.json({ numero: (rows[0].total + 1).toString().padStart(4, '0') });
-});
-
-app.get('/api/produccion/materia', async (req, res) => {
-    const rows = await q("SELECT * FROM materia_prima WHERE company_id = ?", [req.query.company_id]);
-    res.json(rows);
-});
-
-app.post('/api/produccion/materia', async (req, res) => {
-    const { nombre, unidad_medida, cantidad, costo, company_id } = req.body;
-    await q("INSERT INTO materia_prima (nombre, unidad_medida, cantidad, costo, company_id) VALUES (?,?,?,?,?)", [nombre, unidad_medida, cantidad, costo, company_id]);
-    res.json({ success: true });
-});
-
-app.get('/api/produccion/ordenes', async (req, res) => {
-    const rows = await q("SELECT * FROM ordenes_produccion WHERE company_id = ?", [req.query.company_id]);
-    res.json(rows);
-});
-
-app.post('/api/produccion/ordenes', async (req, res) => {
-    const { numero_orden, nombre_producto, cantidad, company_id } = req.body;
-    await q("INSERT INTO ordenes_produccion (numero_orden, nombre_producto, cantidad_producir, company_id, estado) VALUES (?,?,?,?, 'Prealistamiento')", [numero_orden, nombre_producto, cantidad, company_id]);
-    res.json({ success: true });
-});
-
-app.put('/api/produccion/ordenes/:id', async (req, res) => {
-    await q("UPDATE ordenes_produccion SET estado=? WHERE id=?", [req.body.estado, req.params.id]);
-    res.json({ success: true });
-});
-
-// --- NÓMINA ---
-app.get('/api/empleados', async (req, res) => {
-    const rows = await q("SELECT * FROM empleados WHERE company_id = ?", [req.query.company_id]);
-    res.json(rows);
-});
-
-app.post('/api/empleados', async (req, res) => {
-    const { nombre, email, salario, eps, arl, pension, company_id } = req.body;
-    await q("INSERT INTO empleados (nombre, email, salario, eps, arl, pension, company_id) VALUES (?,?,?,?,?,?,?)", [nombre, email, salario, eps, arl, pension, company_id]);
+app.post('/api/productos', verificarToken, async (req, res) => {
+    const { nombre, sku, precio, stock, bodega_id } = req.body;
+    await q("INSERT INTO productos (nombre, sku, precio, stock, bodega_id, company_id) VALUES (?,?,?,?,?,?)", 
+        [nombre, sku, precio, stock, bodega_id, req.user.company_id]);
     res.json({ success: true });
 });
 
 // --- CAJA ---
-app.get('/api/turnos/activo/:id', async (req, res) => {
-    const rows = await q("SELECT t.*, (SELECT IFNULL(SUM(total),0) FROM ventas WHERE turno_id = t.id) as total_vendido FROM turnos t WHERE usuario_id = ? AND estado = 'Abierto'", [req.params.id]);
+app.get('/api/turnos/activo/:id', verificarToken, async (req, res) => {
+    const rows = await q("SELECT t.*, (SELECT IFNULL(SUM(total),0) FROM ventas WHERE turno_id = t.id) as total_vendido FROM turnos t WHERE usuario_id = ? AND estado = 'Abierto' AND company_id = ?", 
+        [req.params.id, req.user.company_id]);
     res.json(rows[0] || null);
 });
 
-app.post('/api/turnos/iniciar', async (req, res) => {
-    await q("INSERT INTO turnos (usuario_id, nombre_usuario, base_caja, company_id, estado) VALUES (?,?,?,?,'Abierto')", [req.body.usuario_id, req.body.nombre_usuario, req.body.base_caja, req.body.company_id]);
-    res.json({ success: true });
-});
-
-app.put('/api/turnos/finalizar', async (req, res) => {
-    await q("UPDATE turnos SET estado = 'Cerrado' WHERE id = ?", [req.body.turno_id]);
+app.post('/api/turnos/iniciar', verificarToken, async (req, res) => {
+    await q("INSERT INTO turnos (usuario_id, nombre_usuario, base_caja, company_id, estado) VALUES (?,?,?,?,'Abierto')", 
+        [req.user.id, req.body.nombre_usuario, req.body.base_caja, req.user.company_id]);
     res.json({ success: true });
 });
 
 // --- VENTAS ---
-app.post('/api/ventas', async (req, res) => {
-    const { productos, responsable, turno_id, company_id } = req.body;
+app.post('/api/ventas', verificarToken, async (req, res) => {
+    const { productos, responsable, turno_id } = req.body;
     for (const p of productos) {
-        await q("INSERT INTO ventas (producto_id, nombre_producto, cantidad, total, responsable, turno_id, company_id) VALUES (?,?,?,?,?,?,?)", [p.id, p.nombre, p.cant, p.precio * p.cant, responsable, turno_id, company_id]);
-        await q("UPDATE productos SET stock = stock - ? WHERE id = ?", [p.cant, p.id]);
+        await q("INSERT INTO ventas (producto_id, nombre_producto, cantidad, total, responsable, turno_id, company_id) VALUES (?,?,?,?,?,?,?)", 
+            [p.id, p.nombre, p.cantidad, p.precio * p.cantidad, responsable, turno_id, req.user.company_id]);
+        await q("UPDATE productos SET stock = stock - ? WHERE id = ? AND company_id = ?", [p.cantidad, p.id, req.user.company_id]);
     }
     res.json({ success: true });
 });
 
 // --- DASHBOARD ---
-app.get('/api/dashboard-data', async (req, res) => {
-    const { company_id } = req.query;
-    const v = await q("SELECT IFNULL(SUM(total),0) as total FROM ventas WHERE company_id = ?", [company_id]);
-    const p = await q("SELECT IFNULL(SUM(precio * stock),0) as valor FROM productos WHERE company_id = ?", [company_id]);
-    const c = await q("SELECT COUNT(*) as low FROM productos WHERE stock <= min_stock AND company_id = ?", [company_id]);
+app.get('/api/dashboard-data', verificarToken, async (req, res) => {
+    const cid = req.user.company_id;
+    const v = await q("SELECT IFNULL(SUM(total),0) as total FROM ventas WHERE company_id = ?", [cid]);
+    const p = await q("SELECT IFNULL(SUM(precio * stock),0) as valor FROM productos WHERE company_id = ?", [cid]);
+    const c = await q("SELECT COUNT(*) as low FROM productos WHERE stock <= 5 AND company_id = ?", [cid]);
     res.json({ cajaMayor: v[0].total, valorInventario: p[0].valor, lowStock: c[0].low });
 });
 
+// Servir estáticos de React
+app.use(express.static(path.join(__dirname, '../frontend/build')));
 app.get(/.*/, (req, res) => res.sendFile(path.join(__dirname, '../frontend/build', 'index.html')));
 
 module.exports = app;
