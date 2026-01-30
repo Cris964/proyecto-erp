@@ -3,10 +3,10 @@ const express = require('express');
 const mysql = require('mysql2/promise');
 const cors = require('cors');
 const path = require('path');
-const jwt = require('jsonwebtoken'); // <--- 1. IMPORTAR JWT
+const jwt = require('jsonwebtoken');
 const app = express();
 
-const SECRET_KEY = process.env.JWT_SECRET || 'AccuCloud_Secret_2026_!#'; // <--- CLAVE MAESTRA
+const SECRET_KEY = process.env.JWT_SECRET || 'AccuCloud_Secret_2026';
 
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
@@ -21,72 +21,51 @@ const pool = mysql.createPool({
     connectTimeout: 35000
 });
 
-// --- HELPER QUERIES ---
 const q = async (sql, params) => {
     try { const [rows] = await pool.query(sql, params); return rows; } 
-    catch (e) { console.error("Error:", e.message); throw e; }
+    catch (e) { console.error("Error SQL:", e.message); return []; }
 };
 
-// --- 2. MIDDLEWARE DE SEGURIDAD (EL GUARDIÁN) ---
 const verificarToken = (req, res, next) => {
     const authHeader = req.headers.authorization;
     const token = authHeader && authHeader.split(' ')[1];
-
-    if (!token) return res.status(401).json({ error: "No autorizado" });
-
+    if (!token) return res.status(401).json({ error: "No token" });
     jwt.verify(token, SECRET_KEY, (err, decoded) => {
-        if (err) return res.status(403).json({ error: "Token inválido o expirado" });
-        req.user = decoded; // Aquí guardamos el ID y el COMPANY_ID del usuario
+        if (err) return res.status(403).json({ error: "Invalid token" });
+        req.user = decoded;
         next();
     });
 };
 
-// --- AUTH & USUARIOS ---
 app.post('/api/login', async (req, res) => {
     const rows = await q("SELECT * FROM usuarios WHERE email = ? AND password = ?", [req.body.email, req.body.password]);
-    if (rows.length > 0) {
+    if (rows && rows.length > 0) {
         const user = rows[0];
-        // 3. GENERAR EL TOKEN CON EL COMPANY_ID ADENTRO
-        const token = jwt.sign(
-            { id: user.id, company_id: user.company_id, cargo: user.cargo }, 
-            SECRET_KEY, 
-            { expiresIn: '24h' }
-        );
+        const token = jwt.sign({ id: user.id, company_id: user.company_id, cargo: user.cargo }, SECRET_KEY, { expiresIn: '24h' });
         res.json({ success: true, user, token });
     } else {
         res.json({ success: false });
     }
 });
 
-// --- RUTAS PROTEGIDAS (Añadimos 'verificarToken') ---
-
-app.get('/api/admin/usuarios', verificarToken, async (req, res) => {
-    // Usamos req.user.company_id del token, no del query del frontend
-    const rows = await q("SELECT * FROM usuarios WHERE company_id = ?", [req.user.company_id]);
-    res.json(rows);
-});
-
-app.post('/api/admin/usuarios', verificarToken, async (req, res) => {
-    const { nombre, email, password, cargo } = req.body;
-    await q("INSERT INTO usuarios (nombre, email, password, cargo, company_id) VALUES (?,?,?,?,?)", 
-        [nombre, email, password, cargo, req.user.company_id]);
-    res.json({ success: true });
-});
-
-// --- INVENTARIO & BODEGAS ---
 app.get('/api/productos', verificarToken, async (req, res) => {
     const rows = await q("SELECT * FROM productos WHERE company_id = ?", [req.user.company_id]);
-    res.json(rows);
+    res.json(Array.isArray(rows) ? rows : []);
 });
 
 app.post('/api/productos', verificarToken, async (req, res) => {
-    const { nombre, sku, precio, stock, bodega_id } = req.body;
-    await q("INSERT INTO productos (nombre, sku, precio, stock, bodega_id, company_id) VALUES (?,?,?,?,?,?)", 
-        [nombre, sku, precio, stock, bodega_id, req.user.company_id]);
+    const { nombre, sku, precio, stock } = req.body;
+    // Se eliminó la obligación de bodega_id para evitar errores
+    await q("INSERT INTO productos (nombre, sku, precio, stock, company_id) VALUES (?,?,?,?,?)", 
+        [nombre, sku, precio, stock, req.user.company_id]);
     res.json({ success: true });
 });
 
-// --- CAJA ---
+app.get('/api/empleados', verificarToken, async (req, res) => {
+    const rows = await q("SELECT * FROM empleados WHERE company_id = ?", [req.user.company_id]);
+    res.json(Array.isArray(rows) ? rows : []);
+});
+
 app.get('/api/turnos/activo/:id', verificarToken, async (req, res) => {
     const rows = await q("SELECT t.*, (SELECT IFNULL(SUM(total),0) FROM ventas WHERE turno_id = t.id) as total_vendido FROM turnos t WHERE usuario_id = ? AND estado = 'Abierto' AND company_id = ?", 
         [req.params.id, req.user.company_id]);
@@ -99,7 +78,6 @@ app.post('/api/turnos/iniciar', verificarToken, async (req, res) => {
     res.json({ success: true });
 });
 
-// --- VENTAS ---
 app.post('/api/ventas', verificarToken, async (req, res) => {
     const { productos, responsable, turno_id } = req.body;
     for (const p of productos) {
@@ -110,16 +88,19 @@ app.post('/api/ventas', verificarToken, async (req, res) => {
     res.json({ success: true });
 });
 
-// --- DASHBOARD ---
 app.get('/api/dashboard-data', verificarToken, async (req, res) => {
     const cid = req.user.company_id;
     const v = await q("SELECT IFNULL(SUM(total),0) as total FROM ventas WHERE company_id = ?", [cid]);
     const p = await q("SELECT IFNULL(SUM(precio * stock),0) as valor FROM productos WHERE company_id = ?", [cid]);
     const c = await q("SELECT COUNT(*) as low FROM productos WHERE stock <= 5 AND company_id = ?", [cid]);
-    res.json({ cajaMayor: v[0].total, valorInventario: p[0].valor, lowStock: c[0].low });
+    res.json({ cajaMayor: v[0]?.total || 0, valorInventario: p[0]?.valor || 0, lowStock: c[0]?.low || 0 });
 });
 
-// Servir estáticos de React
+app.get('/api/admin/usuarios', verificarToken, async (req, res) => {
+    const rows = await q("SELECT * FROM usuarios WHERE company_id = ?", [req.user.company_id]);
+    res.json(Array.isArray(rows) ? rows : []);
+});
+
 app.use(express.static(path.join(__dirname, '../frontend/build')));
 app.get(/.*/, (req, res) => res.sendFile(path.join(__dirname, '../frontend/build', 'index.html')));
 

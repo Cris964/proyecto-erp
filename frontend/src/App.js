@@ -387,25 +387,40 @@ function CajaView({ user, turnoActivo, onUpdate }) {
 // ==========================================
 //           VISTA: NÓMINA CLOUD
 // ==========================================
-function NominaView({ user }) {
+function NominaView() {
     const [empleados, setEmpleados] = useState([]);
-    useEffect(() => { axios.get('/empleados').then(res => setEmpleados(res.data)); }, []);
+    
+    useEffect(() => { 
+        axios.get('/empleados')
+            .then(res => {
+                // Forzamos que siempre sea un array para evitar pantalla blanca
+                setEmpleados(Array.isArray(res.data) ? res.data : []);
+            })
+            .catch(err => {
+                console.error("Error cargando nomina", err);
+                setEmpleados([]);
+            });
+    }, []);
 
     return (
         <div className="space-y-8 animate-fade-in">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {(empleados || []).map(e => (
+                {empleados.length > 0 ? empleados.map(e => (
                     <div key={e.id} className="bg-white p-8 rounded-[40px] shadow-sm border flex items-center gap-6">
                         <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center font-black text-2xl">
-                            {e.nombre.charAt(0)}
+                            {e?.nombre?.charAt(0) || 'U'}
                         </div>
                         <div>
-                            <p className="font-black text-slate-800 text-lg leading-none">{e.nombre}</p>
-                            <p className="text-xs font-bold text-slate-400 mt-1 uppercase">{e.eps} | {e.arl}</p>
-                            <p className="text-xl font-black text-green-600 mt-2">{fmt(e.salario)}</p>
+                            <p className="font-black text-slate-800 text-lg leading-none">{e?.nombre || 'Sin Nombre'}</p>
+                            <p className="text-xs font-bold text-slate-400 mt-1 uppercase">{e?.eps || 'EPS'} | {e?.arl || 'ARL'}</p>
+                            <p className="text-xl font-black text-green-600 mt-2">{fmt(e?.salario)}</p>
                         </div>
                     </div>
-                ))}
+                )) : (
+                    <div className="col-span-full p-20 text-center bg-white rounded-[40px] border-2 border-dashed text-slate-300 font-black uppercase">
+                        No hay empleados registrados
+                    </div>
+                )}
                 <div className="bg-blue-600 p-8 rounded-[40px] shadow-xl text-white flex flex-col justify-center items-center cursor-pointer hover:scale-105 transition-all">
                     <Users size={32} className="mb-2"/>
                     <p className="font-black text-sm uppercase">Agregar Empleado</p>
