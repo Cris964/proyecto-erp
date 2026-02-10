@@ -4,7 +4,7 @@ const mysql = require('mysql2/promise');
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
 const app = express();
-const SECRET = 'AccuCloud_Final_2026_Ultimate';
+const SECRET = 'AccuCloud_Extreme_2026_Final';
 
 app.use(cors()); app.use(express.json({ limit: '50mb' }));
 const pool = mysql.createPool({ host: process.env.DB_HOST, user: process.env.DB_USER, password: process.env.DB_PASSWORD, database: process.env.DB_NAME, ssl: { rejectUnauthorized: false } });
@@ -26,41 +26,21 @@ app.post('/api/login', async (req, res) => {
     } else res.json({ success: false });
 });
 
-// --- METRICAS DASHBOARD ---
+// --- DASHBOARD REAL ---
 app.get('/api/dashboard-data', auth, async (req, res) => {
     const cid = req.user.company_id;
     const [v] = await q("SELECT IFNULL(SUM(total),0) as t FROM ventas WHERE company_id=?", [cid]);
     const [b] = await q("SELECT IFNULL(SUM(base_caja),0) as t FROM turnos WHERE company_id=?", [cid]);
     const top = await q("SELECT nombre_producto, SUM(cantidad) as total FROM ventas WHERE company_id=? GROUP BY nombre_producto ORDER BY total DESC LIMIT 5", [cid]);
-    res.json({ cajaMayor: parseFloat(v.t) + parseFloat(b.t), topProducts: top });
+    const [l] = await q("SELECT COUNT(*) as c FROM productos WHERE stock <= min_stock AND company_id=?", [cid]);
+    res.json({ cajaMayor: parseFloat(v.t) + parseFloat(b.t), topProducts: top, lowStock: l.c });
 });
 
 // --- INVENTARIO ---
-app.get('/api/productos', auth, async (req, res) => res.json(await q("SELECT p.*, b.nombre as bodega_nombre FROM productos p LEFT JOIN bodegas b ON p.bodega_id=b.id WHERE p.company_id=?", [req.user.company_id])));
+app.get('/api/productos', auth, async (req, res) => res.json(await q("SELECT p.*, b.nombre as b_name FROM productos p LEFT JOIN bodegas b ON p.bodega_id=b.id WHERE p.company_id=?", [req.user.company_id])));
 app.post('/api/productos', auth, async (req, res) => {
     const { sku, nombre, fecha_vencimiento, costo_compra, costo_venta, stock, min_stock, bodega_id } = req.body;
-    await q("INSERT INTO productos (company_id, sku, nombre, fecha_vencimiento, costo_compra, costo_venta, stock, min_stock, bodega_id) VALUES (?,?,?,?,?,?,?,?,?)", [req.user.company_id, sku, nombre, fecha_vencimiento, costo_compra, costo_venta, stock, min_stock, bodega_id || null]);
-    res.json({ success: true });
-});
-
-app.get('/api/bodegas', auth, async (req, res) => res.json(await q("SELECT * FROM bodegas WHERE company_id=?", [req.user.company_id])));
-app.post('/api/bodegas', auth, async (req, res) => {
-    await q("INSERT INTO bodegas (company_id, nombre, detalles) VALUES (?,?,?)", [req.user.company_id, req.body.nombre, req.body.detalles]);
-    res.json({ success: true });
-});
-
-// --- PAGOS Y CAJA MENOR ---
-app.get('/api/pagos', auth, async (req, res) => res.json(await q("SELECT * FROM pagos_gastos WHERE company_id=? ORDER BY fecha DESC", [req.user.company_id])));
-app.post('/api/pagos', auth, async (req, res) => {
-    const { beneficiario, monto, descripcion, categoria, meto_pago } = req.body;
-    await q("INSERT INTO pagos_gastos (company_id, beneficiario, monto, descripcion, categoria, meto_pago) VALUES (?,?,?,?,?,?)", [req.user.company_id, beneficiario, monto, descripcion, categoria, meto_pago]);
-    res.json({ success: true });
-});
-
-app.get('/api/caja-menor', auth, async (req, res) => res.json(await q("SELECT * FROM caja_menor_movs WHERE company_id=? ORDER BY fecha DESC", [req.user.company_id])));
-app.post('/api/caja-menor', auth, async (req, res) => {
-    const { tipo, tarjeta, monto, descripcion } = req.body;
-    await q("INSERT INTO caja_menor_movs (company_id, tipo, detalle_tarjeta, monto, descripcion) VALUES (?,?,?,?,?)", [req.user.company_id, tipo, tarjeta, monto, descripcion]);
+    await q("INSERT INTO productos (company_id, sku, nombre, fecha_vencimiento, costo_compra, costo_venta, stock, min_stock, bodega_id) VALUES (?,?,?,?,?,?,?,?,?)", [req.user.company_id, sku, nombre, fecha_vencimiento, costo_compra, costo_venta, stock, min_stock, bodega_id]);
     res.json({ success: true });
 });
 
@@ -72,7 +52,17 @@ app.post('/api/empleados', auth, async (req, res) => {
     res.json({ success: true });
 });
 
-// --- CAJA TURNOS ---
+// --- VENTAS TPV ---
+app.post('/api/ventas', auth, async (req, res) => {
+    const { productos, turno_id } = req.body;
+    for (let p of productos) {
+        await q("INSERT INTO ventas (company_id, producto_id, nombre_producto, cantidad, total, turno_id) VALUES (?,?,?,?,?,?)", [req.user.company_id, p.id, p.nombre, p.cantidad, p.costo_venta * p.cantidad, turno_id]);
+        await q("UPDATE productos SET stock = stock - ? WHERE id=?", [p.cantidad, p.id]);
+    }
+    res.json({ success: true });
+});
+
+// --- CAJA ---
 app.get('/api/turnos/activo/:id', auth, async (req, res) => {
     const r = await q("SELECT t.*, (SELECT IFNULL(SUM(total),0) FROM ventas WHERE turno_id=t.id) as total_vendido FROM turnos t WHERE usuario_id=? AND estado='Abierto'", [req.params.id]);
     res.json(r[0] || null);
@@ -81,30 +71,5 @@ app.post('/api/turnos/iniciar', auth, async (req, res) => {
     await q("INSERT INTO turnos (usuario_id, nombre_usuario, base_caja, company_id, estado) VALUES (?,?,?,?,'Abierto')", [req.user.id, req.user.nombre, req.body.base_caja, req.user.company_id]);
     res.json({ success: true });
 });
-app.put('/api/turnos/finalizar', auth, async (req, res) => {
-    await q("UPDATE turnos SET estado='Cerrado' WHERE id=?", [req.body.turno_id]);
-    res.json({ success: true });
-});
-
-// --- PRODUCCION ---
-app.get('/api/produccion/ordenes', auth, async (req, res) => {
-    res.json(await q("SELECT o.*, r.nombre_kit FROM ordenes_produccion o JOIN recetas r ON o.receta_id=r.id WHERE o.company_id=?", [req.user.company_id]));
-});
-app.get('/api/produccion/recetas', auth, async (req, res) => res.json(await q("SELECT * FROM recetas WHERE company_id=?", [req.user.company_id])));
-app.post('/api/produccion/ordenes', auth, async (req, res) => {
-    await q("INSERT INTO ordenes_produccion (company_id, numero_orden, receta_id, cantidad_requerida, usuario_monta) VALUES (?,?,?,?,?)", [req.user.company_id, 'OP-'+Date.now(), req.body.receta_id, req.body.cantidad, req.user.nombre]);
-    res.json({ success: true });
-});
-app.put('/api/produccion/ordenes/:id/avanzar', auth, async (req, res) => {
-    const { estado, out, obs } = req.body;
-    let upd = "";
-    if(estado==='Alistada') upd = "usuario_bodeguero_alista='"+req.user.nombre+"'";
-    if(estado==='Procesada') upd = "usuario_produccion='"+req.user.nombre+"', cantidad_salida="+out+", observaciones='"+obs+"'";
-    if(estado==='Terminada') upd = "usuario_bodeguero_recibe='"+req.user.nombre+"'";
-    await q(`UPDATE ordenes_produccion SET estado=?, ${upd} WHERE id=?`, [estado, req.params.id]);
-    res.json({ success: true });
-});
-
-app.get('/api/admin/usuarios', auth, async (req, res) => res.json(await q("SELECT * FROM usuarios WHERE company_id=?", [req.user.company_id])));
 
 module.exports = app;
