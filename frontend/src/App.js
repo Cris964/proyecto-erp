@@ -38,7 +38,7 @@ export default function App() {
     localStorage.setItem('theme', next ? 'dark' : 'light');
   };
 
-  if (loading) return <div className="h-screen flex items-center justify-center font-black animate-pulse text-blue-600 text-2xl uppercase italic">ACCUCLOUD PRO 2026...</div>;
+  if (loading) return <div className="h-screen flex items-center justify-center font-black animate-pulse text-blue-600">CARGANDO ACCUCLOUD PRO...</div>;
   if (!user) return <Login onLogin={(d) => { setUser(d.user); localStorage.setItem('erp_user', JSON.stringify(d.user)); localStorage.setItem('erp_token', d.token); }} />;
 
   return (
@@ -66,20 +66,19 @@ export default function App() {
           </nav>
 
           <div className="pt-6 border-t dark:border-slate-800 mt-6 flex flex-col gap-4">
-              <div className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-800 rounded-2xl border dark:border-slate-700 overflow-hidden">
-                  <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white font-black">
+              <div className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-800 rounded-2xl border dark:border-slate-700">
+                  <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white font-black overflow-hidden shadow-inner">
                       {user.avatar_url ? <img src={user.avatar_url} className="w-full h-full object-cover" /> : user.nombre.charAt(0)}
                   </div>
-                  <div className="truncate">
-                      <p className="text-sm font-black text-slate-800 dark:text-white truncate">{user.nombre}</p>
-                      <p className="text-[9px] font-bold text-slate-400 uppercase">{user.cargo}</p>
+                  <div className="overflow-hidden truncate text-xs font-black">
+                      <p className="dark:text-white truncate">{user.nombre}</p>
+                      <p className="text-slate-400 uppercase">{user.cargo}</p>
                   </div>
               </div>
               <button onClick={()=>{localStorage.clear(); window.location.reload();}} className="text-red-500 font-bold text-xs uppercase p-4 rounded-2xl w-full transition hover:bg-red-50 dark:hover:bg-red-900/20">Cerrar Sesión</button>
           </div>
         </aside>
 
-        {/* MAIN */}
         <main className="flex-1 overflow-auto p-12 bg-slate-50 dark:bg-slate-950">
             <div className="animate-fade-in pb-10">
                 {tab==='dashboard' && <DashboardView />}
@@ -98,7 +97,7 @@ export default function App() {
 }
 
 // ==========================================
-//           VISTAS (CONTENIDO REAL)
+//           VISTAS REALES
 // ==========================================
 
 function DashboardView() {
@@ -115,7 +114,7 @@ function DashboardView() {
 
             <div className="grid grid-cols-2 gap-10">
                 <div className="bg-white dark:bg-slate-900 p-10 rounded-[50px] shadow-sm border dark:border-slate-800 h-96">
-                    <h3 className="font-black text-xl mb-10 flex items-center gap-3 text-slate-400 uppercase text-[10px] tracking-widest"><TrendingUp className="text-blue-600"/> Rendimiento de Ventas</h3>
+                    <h3 className="font-black text-xl mb-10 flex items-center gap-3 text-slate-400 uppercase text-[10px] tracking-widest"><TrendingUp className="text-blue-600"/> Rendimiento Semanal</h3>
                     <div className="h-64">
                         <ResponsiveContainer width="100%" height="100%">
                             <BarChart data={[{n:'L',v:400},{n:'M',v:700},{n:'M',v:500},{n:'J',v:900},{n:'V',v:1200},{n:'S',v:1500}]}>
@@ -168,7 +167,7 @@ function VentasView({ user }) {
             <div className="col-span-2 space-y-6">
                 <div className="bg-white dark:bg-slate-900 p-6 rounded-[30px] border dark:border-slate-800 shadow-sm flex items-center gap-4">
                     <Search className="text-slate-400"/>
-                    <input className="w-full bg-transparent font-bold outline-none dark:text-white text-lg" placeholder="Buscar por nombre..." onChange={e=>setSearch(e.target.value)} />
+                    <input className="w-full bg-transparent font-bold outline-none dark:text-white text-lg" placeholder="Buscar producto..." onChange={e=>setSearch(e.target.value)} />
                 </div>
                 <div className="grid grid-cols-3 gap-6 overflow-auto max-h-[600px] pr-2">
                     {prods.filter(p=>p.nombre.toLowerCase().includes(search.toLowerCase())).map(p => (
@@ -176,6 +175,7 @@ function VentasView({ user }) {
                             <div className="h-20 w-full bg-slate-50 dark:bg-slate-800 rounded-[30px] mb-4 flex items-center justify-center text-slate-300"><Box size={32}/></div>
                             <p className="font-black dark:text-white truncate mb-1">{p.nombre}</p>
                             <p className="text-xl font-black text-blue-600">{fmt(p.costo_venta)}</p>
+                            <p className="text-[10px] font-bold text-slate-400 mt-2 uppercase">Stock: {p.stock}</p>
                         </div>
                     ))}
                 </div>
@@ -192,7 +192,7 @@ function VentasView({ user }) {
                 </div>
                 <div className="text-center mb-10 pt-8 border-t dark:border-slate-800">
                     <p className="text-[10px] font-black text-slate-400 uppercase">Total a Recaudar</p>
-                    <h2 className="text-5xl font-black text-slate-800 dark:text-white tracking-tighter">{fmt(cart.reduce((s,i)=>s+(i.costo_venta*i.cantidad),0))}</h2>
+                    <h2 className="text-6xl font-black text-slate-800 dark:text-white tracking-tighter leading-none">{fmt(cart.reduce((s,i)=>s+(i.costo_venta*i.cantidad),0))}</h2>
                 </div>
                 <button onClick={async()=>{ await axios.post('/api/ventas', {productos:cart, turno_id:turno.id}); alert("Venta Exitosa"); setCart([]); load(); }} className="w-full py-7 bg-blue-600 text-white font-black rounded-3xl shadow-xl uppercase transition hover:scale-[1.03]">Cobrar Factura</button>
             </div>
@@ -234,7 +234,7 @@ function InventarioView() {
                                 <td className="text-red-500 font-bold">{p.fecha_vencimiento}</td>
                                 <td>{fmt(p.costo_compra)}</td>
                                 <td className="font-black text-blue-600">{fmt(p.costo_venta)}</td>
-                                <td className={`font-black ${p.stock <= p.min_stock ? 'text-red-500 animate-pulse' : 'dark:text-white'}`}>{p.stock}</td>
+                                <td className={`font-black dark:text-white`}>{p.stock}</td>
                                 <td><span className="bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 px-3 py-1 rounded-xl font-black">{(((p.costo_venta-p.costo_compra)/p.costo_venta)*100).toFixed(0)}%</span></td>
                             </tr>
                         ))}</tbody>
@@ -243,13 +243,13 @@ function InventarioView() {
             )}
 
             {sub==='new' && (
-                <form onSubmit={async(e)=>{e.preventDefault(); await axios.post('/api/productos', fP); alert("Sincronizado"); load(); setSub('list');}} className="bg-white dark:bg-slate-900 p-12 rounded-[60px] border dark:border-slate-800 shadow-2xl max-w-2xl mx-auto space-y-6">
+                <form onSubmit={async(e)=>{e.preventDefault(); await axios.post('/api/productos', fP); alert("Guardado"); load(); setSub('list');}} className="bg-white dark:bg-slate-900 p-12 rounded-[60px] border dark:border-slate-800 shadow-2xl max-w-2xl mx-auto space-y-6">
                     <h3 className="text-2xl font-black italic dark:text-white text-center">Nuevo Ingreso a Stock</h3>
-                    <input className="w-full p-5 bg-slate-50 dark:bg-slate-800 rounded-3xl font-bold border-none dark:text-white" placeholder="Nombre Comercial" onChange={e=>setFP({...fP, nombre:e.target.value})} required/>
-                    <input className="w-full p-5 bg-slate-50 dark:bg-slate-800 rounded-3xl font-bold border-none dark:text-white" placeholder="SKU" onChange={e=>setFP({...fP, sku:e.target.value})} required/>
-                    <div className="grid grid-cols-2 gap-6">
-                        <input className="p-5 bg-slate-50 dark:bg-slate-800 rounded-3xl font-bold border-none dark:text-white" placeholder="Costo Compra $" type="number" onChange={e=>setFP({...fP, costo_compra:e.target.value})} required/>
-                        <input className="p-5 bg-slate-50 dark:bg-slate-800 rounded-3xl font-bold border-none dark:text-white" placeholder="Costo Venta $" type="number" onChange={e=>setFP({...fP, costo_venta:e.target.value})} required/>
+                    <input className="w-full p-5 bg-slate-50 dark:bg-slate-800 rounded-3xl font-bold border-none dark:text-white" placeholder="Nombre" onChange={e=>setFP({...fP, nombre:e.target.value})} required/>
+                    <input className="w-full p-5 bg-slate-50 dark:bg-slate-800 rounded-3xl font-bold border-none dark:text-white" placeholder="Código SKU" onChange={e=>setFP({...fP, sku:e.target.value})} required/>
+                    <div className="grid grid-cols-2 gap-6 text-left">
+                        <div className="space-y-1"><label className="text-[9px] font-black uppercase text-slate-400 ml-4">Costo de Compra</label><input className="w-full p-5 bg-slate-50 dark:bg-slate-800 rounded-3xl font-bold border-none dark:text-white" type="number" onChange={e=>setFP({...fP, costo_compra:e.target.value})} required/></div>
+                        <div className="space-y-1"><label className="text-[9px] font-black uppercase text-slate-400 ml-4">Precio de Venta</label><input className="w-full p-5 bg-slate-50 dark:bg-slate-800 rounded-3xl font-bold border-none dark:text-white" type="number" onChange={e=>setFP({...fP, costo_venta:e.target.value})} required/></div>
                     </div>
                     <div className="grid grid-cols-2 gap-6 text-left">
                         <div className="space-y-1"><label className="text-[9px] font-black uppercase text-slate-400 ml-4">Stock Inicial</label><input className="w-full p-5 bg-slate-50 dark:bg-slate-800 rounded-3xl font-bold border-none dark:text-white" type="number" onChange={e=>setFP({...fP, stock:e.target.value})} required/></div>
@@ -265,9 +265,9 @@ function InventarioView() {
             {sub==='bod' && (
                 <div className="grid grid-cols-2 gap-12 h-fit">
                     <div className="bg-white dark:bg-slate-900 p-12 rounded-[50px] border dark:border-slate-800 shadow-2xl space-y-6 h-fit text-center">
-                        <h3 className="text-2xl font-black italic dark:text-white">Registrar Bodega</h3>
-                        <input className="w-full p-5 bg-slate-50 dark:bg-slate-800 rounded-3xl border-none mb-4 dark:text-white" id="bN" placeholder="Nombre" />
-                        <textarea className="w-full p-5 bg-slate-50 dark:bg-slate-800 rounded-3xl border-none mb-6 dark:text-white" id="bD" placeholder="Detalles de ubicación" />
+                        <h3 className="text-2xl font-black italic dark:text-white">Registrar Dependencia</h3>
+                        <input className="w-full p-5 bg-slate-50 dark:bg-slate-800 rounded-3xl border-none mb-4 dark:text-white" id="bN" placeholder="Nombre Bodega" />
+                        <textarea className="w-full p-5 bg-slate-50 dark:bg-slate-800 rounded-3xl border-none mb-6 dark:text-white" id="bD" placeholder="Detalles" />
                         <button onClick={async()=>{ await axios.post('/api/bodegas', {nombre:document.getElementById('bN').value, detalles:document.getElementById('bD').value}); alert("Creada"); load(); }} className="w-full py-6 bg-slate-900 dark:bg-blue-600 text-white font-black rounded-3xl shadow-xl">CREAR BODEGA</button>
                     </div>
                     <div className="bg-white dark:bg-slate-900 rounded-[50px] border dark:border-slate-800 shadow-sm overflow-hidden h-fit">
@@ -328,7 +328,7 @@ function ProduccionView({ user }) {
                         <button onClick={async()=>{ await axios.post('/api/produccion/ordenes', {receta_id:document.getElementById('rI').value, cantidad:document.getElementById('rC').value}); load(); alert("Orden Montada"); }} className="bg-blue-600 text-white px-12 py-5 rounded-3xl font-black shadow-xl uppercase transition active:scale-95">Lanzar Órden</button>
                     </div>
                     {ordenes.map(o => (
-                        <div key={o.id} className="bg-white dark:bg-slate-900 p-10 rounded-[45px] border dark:border-slate-800 shadow-sm flex justify-between items-center group hover:border-blue-500 transition-all">
+                        <div key={o.id} className="bg-white dark:bg-slate-900 p-10 rounded-[45px] border shadow-sm flex justify-between items-center group hover:border-blue-500 transition-all">
                             <div><h4 className="text-2xl font-black text-slate-900 dark:text-white italic uppercase">{o.numero_orden} - {o.nombre_kit}</h4><p className="text-[10px] font-bold text-slate-400 uppercase mt-3"><span>Montó: {o.usuario_monta}</span></p></div>
                             <div className="flex items-center gap-8">
                                 <div className="text-right"><p className="text-[10px] font-black uppercase text-slate-400 mb-1 uppercase">Requerido</p><p className="font-black text-2xl dark:text-white">{o.cantidad_requerida}</p></div>
@@ -353,7 +353,7 @@ function NominaView() {
 
     return (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-12 h-fit animate-fade-in">
-            <form onSubmit={async(e)=>{e.preventDefault(); await axios.post('/api/empleados', fN); alert("Vinculado"); load(); e.target.reset();}} className="bg-white dark:bg-slate-900 p-12 rounded-[50px] border dark:border-slate-800 shadow-2xl space-y-6 h-fit">
+            <form onSubmit={async(e)=>{e.preventDefault(); await axios.post('/api/empleados', fN); alert("Vinculado"); load();}} className="bg-white dark:bg-slate-900 p-12 rounded-[50px] border dark:border-slate-800 shadow-2xl space-y-6 h-fit">
                 <h3 className="text-2xl font-black italic dark:text-white">Vincular Funcionario</h3>
                 <input className="w-full p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl font-bold border-none dark:text-white" placeholder="Nombre" onChange={e=>setFN({...fN, nombre:e.target.value})}/>
                 <input className="w-full p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl font-bold border-none dark:text-white" placeholder="Doc" onChange={e=>setFN({...fN, documento:e.target.value})}/>
@@ -366,7 +366,7 @@ function NominaView() {
                     <input className="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border-none text-[9px] font-black dark:text-white uppercase" placeholder="ARL" onChange={e=>setFN({...fN, arl:e.target.value})}/>
                     <input className="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border-none text-[9px] font-black dark:text-white uppercase" placeholder="Pen" onChange={e=>setFN({...fN, pension:e.target.value})}/>
                 </div>
-                <button type="submit" className="w-full py-6 bg-blue-600 text-white font-black rounded-3xl shadow-xl uppercase transition hover:scale-[1.02]">Vincular Ahora</button>
+                <button type="submit" className="w-full py-6 bg-blue-600 text-white font-black rounded-3xl shadow-xl uppercase">Vincular Ahora</button>
             </form>
             <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-8 h-fit">
                 {emps.map(e => (
@@ -377,7 +377,7 @@ function NominaView() {
                         </div>
                         <div className="flex justify-between items-center bg-slate-50 dark:bg-slate-800 p-6 rounded-[30px]">
                             <div><p className="text-[9px] font-black text-slate-400 uppercase">Jornada</p><p className="text-3xl font-black text-green-600">{fmt(e.valor_dia)}</p></div>
-                            <button onClick={()=>alert(`Neto Mes (30d): ${fmt(e.valor_dia * 30 + 162000)}`)} className="bg-slate-900 dark:bg-blue-600 text-white px-8 py-3 rounded-2xl font-black text-[10px] uppercase shadow-lg">LIQUIDAR</button>
+                            <button onClick={()=>alert(`Liquidando a ${e.nombre}... Salario Mes: ${fmt(e.valor_dia * 30)}`)} className="bg-slate-900 dark:bg-blue-600 text-white px-8 py-3 rounded-2xl font-black text-[10px] uppercase shadow-lg">LIQUIDAR</button>
                         </div>
                     </div>
                 ))}
@@ -389,7 +389,7 @@ function NominaView() {
 function ConfigView({ user, setUser }) {
     const [f, setF] = useState({ nombre:user.nombre, telefono:user.telefono||'', direccion:user.direccion||'', avatar_url:user.avatar_url||'' });
     return (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 animate-fade-in">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 animate-fade-in h-fit">
             <div className="bg-white dark:bg-slate-900 p-12 rounded-[60px] border dark:border-slate-800 shadow-2xl space-y-10">
                 <div className="flex items-center gap-8 border-b dark:border-slate-800 pb-10">
                     <div className="relative group">
@@ -398,7 +398,7 @@ function ConfigView({ user, setUser }) {
                         </div>
                         <div className="absolute bottom-0 right-0 p-3 bg-blue-600 text-white rounded-2xl shadow-xl cursor-pointer hover:scale-110 transition-transform"><Camera size={16}/></div>
                     </div>
-                    <div><h3 className="text-3xl font-black text-slate-900 dark:text-white leading-none mb-2">Mi Perfil</h3><p className="text-slate-400 font-bold uppercase text-xs tracking-widest">SaaS Cloud Premium 2026</p></div>
+                    <div><h3 className="text-3xl font-black text-slate-900 dark:text-white leading-none mb-2">Mi Perfil</h3><p className="text-slate-400 font-bold uppercase text-xs">SaaS Cloud Premium 2026</p></div>
                 </div>
                 <form onSubmit={async(e)=>{e.preventDefault(); await axios.put('/api/perfil', f); alert("Perfil Actualizado"); setUser({...user, ...f}); localStorage.setItem('erp_user', JSON.stringify({...user, ...f}));}} className="space-y-6">
                     <input className="w-full p-5 bg-slate-50 dark:bg-slate-800 rounded-3xl font-bold border-none dark:text-white outline-none" value={f.nombre} placeholder="Nombre Público" onChange={e=>setF({...f, nombre:e.target.value})} />
@@ -407,48 +407,13 @@ function ConfigView({ user, setUser }) {
                         <input className="p-5 bg-slate-50 dark:bg-slate-800 rounded-3xl font-bold border-none dark:text-white outline-none" value={f.telefono} placeholder="Teléfono" onChange={e=>setF({...f, telefono:e.target.value})} />
                         <input className="p-5 bg-slate-50 dark:bg-slate-800 rounded-3xl font-bold border-none dark:text-white outline-none" value={f.direccion} placeholder="Dirección" onChange={e=>setF({...f, direccion:e.target.value})} />
                     </div>
-                    <button type="submit" className="w-full py-6 bg-slate-900 dark:bg-blue-600 text-white font-black rounded-[30px] shadow-xl uppercase transition hover:scale-[1.01]">Guardar Cambios</button>
+                    <button type="submit" className="w-full py-6 bg-slate-900 dark:bg-blue-600 text-white font-black rounded-[30px] shadow-xl uppercase">Guardar Ajustes</button>
                 </form>
             </div>
-            <div className="bg-blue-600 p-12 rounded-[60px] text-white shadow-2xl h-fit">
+            <div className="bg-blue-600 p-12 rounded-[60px] text-white shadow-2xl h-fit border border-blue-500">
                 <h3 className="text-2xl font-black italic mb-4 flex items-center gap-3"><LifeBuoy/> Soporte VIP 24/7</h3>
                 <p className="text-blue-100 font-bold text-sm leading-relaxed mb-10 uppercase tracking-tighter">¿Dudas técnicas? Accede a nuestra línea prioritaria de asistencia para tu empresa.</p>
                 <button onClick={()=>window.open('https://wa.me/573158022191')} className="bg-white text-blue-600 px-10 py-5 rounded-3xl font-black uppercase text-sm shadow-xl hover:scale-[1.02] transition-transform">WhatsApp Soporte</button>
-            </div>
-        </div>
-    );
-}
-
-function PagosView() {
-    const [data, setData] = useState([]);
-    const [f, setF] = useState({ beneficiario:'', monto:0, descripcion:'', categoria:'Proveedor' });
-    const load = () => axios.get('/api/pagos').then(res => setData(res.data));
-    useEffect(() => { load(); }, []);
-
-    return (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-12 animate-fade-in">
-            <form onSubmit={async(e)=>{e.preventDefault(); await axios.post('/api/pagos', f); alert("Registrado"); load(); e.target.reset();}} className="bg-white dark:bg-slate-900 p-12 rounded-[50px] border dark:border-slate-800 shadow-2xl space-y-6 h-fit">
-                <h3 className="text-2xl font-black italic dark:text-white">Registrar Egreso</h3>
-                <select className="w-full p-5 bg-slate-50 dark:bg-slate-800 rounded-3xl font-black border-none dark:text-white" onChange={e=>setF({...f, categoria:e.target.value})}>
-                    <option value="Proveedor">Proveedor</option><option value="Gasto">Gasto Operativo</option>
-                </select>
-                <input className="w-full p-5 bg-slate-50 dark:bg-slate-800 rounded-3xl font-bold border-none dark:text-white" placeholder="Beneficiario" onChange={e=>setF({...f, beneficiario:e.target.value})}/>
-                <input className="w-full p-5 bg-slate-50 dark:bg-slate-800 rounded-3xl font-bold border-none dark:text-white" placeholder="Monto $" type="number" onChange={e=>setF({...f, monto:e.target.value})}/>
-                <textarea className="w-full p-5 bg-slate-50 dark:bg-slate-800 rounded-3xl font-bold border-none dark:text-white" placeholder="Motivo" onChange={e=>setF({...f, descripcion:e.target.value})}/>
-                <button type="submit" className="w-full py-6 bg-blue-600 text-white font-black rounded-3xl shadow-xl uppercase">Confirmar Pago</button>
-            </form>
-            <div className="lg:col-span-2 bg-white dark:bg-slate-900 rounded-[50px] border dark:border-slate-800 shadow-sm overflow-hidden h-fit">
-                <table className="w-full text-left">
-                    <thead className="bg-slate-50 dark:bg-slate-800 text-[10px] font-black uppercase tracking-widest border-b dark:border-slate-700"><tr><th className="p-8">Fecha/Hora</th><th>Categoría</th><th>Beneficiario</th><th>Monto</th></tr></thead>
-                    <tbody>{data.map(p => (
-                        <tr key={p.id} className="border-b dark:border-slate-800 transition hover:bg-slate-50 dark:hover:bg-slate-800/50">
-                            <td className="p-8 text-[9px] font-black text-slate-400">{new Date(p.fecha).toLocaleString()}</td>
-                            <td><span className={`px-4 py-1 rounded-full text-[9px] font-black uppercase ${p.categoria==='Proveedor'?'bg-purple-100 text-purple-600':'bg-orange-100 text-orange-600'}`}>{p.categoria}</span></td>
-                            <td className="font-black text-slate-700 dark:text-white">{p.beneficiario}</td>
-                            <td className="font-black text-red-600">{fmt(p.monto)}</td>
-                        </tr>
-                    ))}</tbody>
-                </table>
             </div>
         </div>
     );
@@ -459,33 +424,30 @@ function CajaView({ user }) {
     const [activo, setActivo] = useState(null);
     const load = useCallback(() => axios.get('/api/turnos/activo/'+user.id).then(res => setActivo(res.data)).catch(()=>setActivo(null)), [user.id]);
     useEffect(() => { load(); }, [load]);
+
     return (
-        <div className="max-w-2xl mx-auto mt-10 text-center animate-fade-in">
+        <div className="max-w-2xl mx-auto mt-10 animate-fade-in">
             <div className="bg-white dark:bg-slate-900 p-20 rounded-[60px] border dark:border-slate-800 shadow-2xl border-t-[20px] border-blue-600">
                 <div className="w-24 h-24 bg-blue-50 dark:bg-slate-800 text-blue-600 rounded-[40px] flex items-center justify-center mx-auto mb-10"><Wallet size={54}/></div>
                 {activo ? (
-                    <div className="space-y-8 animate-fade-in text-left">
+                    <div className="space-y-8 text-center">
                         <h3 className="text-3xl font-black italic dark:text-white text-center">Turno Abierto</h3>
                         <div className="grid grid-cols-2 gap-6">
-                            <div className="bg-slate-50 dark:bg-slate-800 p-8 rounded-[40px] border dark:border-slate-700"><p className="text-[10px] font-black text-slate-400 uppercase mb-2">Base inicial</p><p className="text-3xl font-black text-slate-600 dark:text-white">{fmt(activo.base_caja)}</p></div>
-                            <div className="bg-blue-50 dark:bg-blue-900/20 p-8 rounded-[40px] border border-blue-100 dark:border-blue-900"><p className="text-[10px] font-black text-blue-400 uppercase mb-2">Ventas Hoy</p><p className="text-3xl font-black text-blue-600">{fmt(activo.total_vendido)}</p></div>
+                            <div className="bg-slate-50 dark:bg-slate-800 p-8 rounded-[40px] text-left"><p className="text-[10px] font-black text-slate-400 uppercase mb-2">Base inicial</p><p className="text-3xl font-black text-slate-600 dark:text-white">{fmt(activo.base_caja)}</p></div>
+                            <div className="bg-blue-50 dark:bg-blue-900/20 p-8 rounded-[40px] text-left border border-blue-100 dark:border-blue-900"><p className="text-[10px] font-black text-blue-400 uppercase mb-2">Vendido</p><p className="text-3xl font-black text-blue-600">{fmt(activo.total_vendido)}</p></div>
                         </div>
-                        <button onClick={async()=>{ if(confirm("¿Cerrar?")){ await axios.put('/api/turnos/finalizar', {turno_id: activo.id}); load(); }}} className="w-full py-7 bg-red-500 text-white font-black rounded-3xl shadow-xl uppercase transition hover:bg-red-600">Cerrar Turno</button>
+                        <button onClick={async()=>{ if(confirm("¿Cerrar?")){ await axios.put('/api/turnos/finalizar', {turno_id: activo.id}); load(); }}} className="w-full py-7 bg-red-500 text-white font-black rounded-3xl shadow-xl uppercase transition hover:bg-red-600">Finalizar Jornada</button>
                     </div>
                 ) : (
                     <div className="space-y-8 animate-fade-in text-center">
                         <h3 className="text-3xl font-black italic dark:text-white">Apertura de Turno</h3>
                         <input id="bC" type="number" className="w-full p-8 bg-slate-50 dark:bg-slate-800 rounded-[35px] font-black text-5xl text-center border-4 border-transparent focus:border-blue-600 dark:text-white outline-none" placeholder="$0" />
-                        <button onClick={async()=>{ await axios.post('/api/turnos/iniciar', {base_caja: document.getElementById('bC').value}); load(); }} className="w-full py-7 bg-blue-600 text-white font-black rounded-3xl shadow-xl uppercase">Abrir Turno Cloud</button>
+                        <button onClick={async()=>{ await axios.post('/api/turnos/iniciar', {base_caja: document.getElementById('bC').value}); load(); }} className="w-full py-7 bg-blue-600 text-white font-black rounded-3xl shadow-xl uppercase">Abrir Caja Cloud</button>
                     </div>
                 )}
             </div>
         </div>
     );
-}
-
-function AdminView() {
-    return <div className="p-20 bg-white dark:bg-slate-900 rounded-[60px] border-4 border-dashed text-center font-black text-slate-300 dark:text-slate-700 text-3xl uppercase">Sincronizando Usuarios...</div>;
 }
 
 // HELPERS UI
@@ -510,10 +472,10 @@ function Login({ onLogin }) {
                 <p className="text-slate-400 font-bold text-[10px] uppercase mb-10 tracking-widest">SaaS ERP Pro 2026</p>
                 <input name="e" className="w-full p-5 bg-slate-50 rounded-3xl font-bold border-none outline-none mb-4" placeholder="Email Corporativo" />
                 <input name="p" className="w-full p-5 bg-slate-50 rounded-3xl font-bold border-none outline-none mb-10" type="password" placeholder="Contraseña" />
-                <button type="submit" className="w-full bg-slate-900 text-white font-black py-6 rounded-3xl shadow-xl uppercase transition hover:bg-black">Entrar al ERP</button>
+                <button type="submit" className="w-full bg-slate-900 text-white font-black py-6 rounded-3xl shadow-xl uppercase transition hover:scale-[1.03]">Entrar al ERP</button>
             </form>
         </div>
     );
 }
 
-function PSEPage({ onBack }) { return null; }
+function PagosView() { return null; }
